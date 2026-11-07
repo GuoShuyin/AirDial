@@ -33,8 +33,11 @@ final class CalibrationController {
     /// Give up on a target after this much time *with a hand in view* (it is skipped).
     /// Time without a hand doesn't count: the calibration simply waits for you.
     var targetTimeout = 12.0
-    /// Point for this long to begin.
-    var startHold = 0.5
+    /// Calibration begins once your index finger has been in the middle of the camera picture for
+    /// `startHold` (moving is fine), followed by a `startDelay` countdown.
+    var startHold = 0.3
+    var startDelay = 2.0
+    private var countdownFrom: Double?
 
     private(set) var isActive = false
 
@@ -84,7 +87,7 @@ final class CalibrationController {
             v.progress = 0
             guard started else {
                 v.target = nil
-                v.caption = "AirDial calibration: raise your index finger and point at this screen to begin"
+                v.caption = "AirDial calibration: hold up your index finger in the middle of the camera picture to begin"
                 v.needsDisplay = true
                 continue
             }
@@ -105,22 +108,32 @@ final class CalibrationController {
         }
     }
 
-    /// Feed every frame: the smoothed fingertip while pointing (or nil), and whether any hand is in view.
-    func update(tip: Vec2?, handVisible: Bool, time t: Double) {
+    /// Feed every frame: the smoothed fingertip while pointing (or nil), whether any hand is in
+    /// view, and the camera frame aspect (fingertip x runs from 0 to aspect).
+    func update(tip: Vec2?, handVisible: Bool, aspect: Double, time t: Double) {
         guard isActive, index < targets.count else { return }
         let dt = lastUpdate.map { min(t - $0, 0.2) } ?? 0
         lastUpdate = t
 
-        // Wait until you start pointing.
         if !started {
-            if tip != nil {
-                let since = pointingSince ?? t
-                pointingSince = since
-                if t - since >= startHold {
+            if let from = countdownFrom {
+                // Counting down: show it, then start.
+                let left = startDelay - (t - from)
+                if left <= 0 {
                     started = true
                     print("[AirDial] Calibration started.")
                     refresh()
+                } else {
+                    let text = "Index finger found. Starting in \(Int(left.rounded(.up)))…"
+                    for v in views where v.caption != text { v.caption = text; v.needsDisplay = true }
                 }
+                return
+            }
+            // Wait for an index finger in the middle of the picture (moving is fine).
+            if let tip = tip, (0.25...0.75).contains(tip.x / aspect), (0.2...0.8).contains(tip.y) {
+                let since = pointingSince ?? t
+                pointingSince = since
+                if t - since >= startHold { countdownFrom = t }
             } else {
                 pointingSince = nil
             }

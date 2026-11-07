@@ -154,4 +154,6 @@ Tests/AirDialCoreTests/ 用合成的手部轨迹测试识别和防误触
 
 ## License
 
-MIT
+[PolyForm Noncommercial 1.0.0](LICENSE)：个人、学习、研究等非商业用途可以免费使用，也可以修改。**商业用途需要另外取得作者授权**，请通过 [GitHub](https://github.com/GuoShuyin) 联系。
+
+MediaPipe 手部模型（`models/hand_landmarker.task`，需要单独下载）属于 Google，采用 Apache License 2.0。

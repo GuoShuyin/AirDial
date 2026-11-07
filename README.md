@@ -154,4 +154,6 @@ Tests/AirDialCoreTests/ Synthetic hand paths testing recognition and false-trigg
 
 ## License
 
-MIT
+[PolyForm Noncommercial 1.0.0](LICENSE): free for personal, educational, research and other noncommercial use, including changing it. **Commercial use requires a separate license from the author**; get in touch through [GitHub](https://github.com/GuoShuyin).
+
+The MediaPipe hand model (`models/hand_landmarker.task`, downloaded separately) is Google's, under the Apache License 2.0.

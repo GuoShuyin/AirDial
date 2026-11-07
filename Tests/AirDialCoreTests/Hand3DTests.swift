@@ -118,6 +118,28 @@ struct Hand3DTests {
         #expect(total > 50)
     }
 
+    @Test func testJitteryRestingThumbNeitherScrollsNorFreezesTheCursor() {
+        // Thumb resting on the middle finger with tracker jitter (+-3 mm back and forth), while
+        // the index fingertip (cursor) moves: no scroll, and the cursor keeps following.
+        var p = PointerTracker()
+        let rest = middlePIP + Vec3(0, 0.006, 0)
+        var scrolled = 0.0
+        var tips: [Double] = []
+        for i in 0..<90 {
+            let t = Double(i) / 30
+            // Jitter plus a slow drift along the finger (8 mm over 3 s, as the hand shifts while
+            // pointing at different places): the drift used to add up to a "scroll" and freeze the cursor.
+            let drift = (Vec3(-0.005, 0.022, -0.032) - middlePIP).normalized * (0.008 * t / 3)
+            let jitter = drift + Vec3(0, 0.003 * sin(Double(i) * 1.7), 0.003 * cos(Double(i) * 2.3))
+            let s = hand3D(thumb: rest + jitter, time: t, indexTip2D: Vec2(0.5 + 0.3 * t / 3, 0.5))
+            _ = p.update(s, time: t, aspect: 4.0 / 3.0)
+            scrolled += abs(p.scroll)
+            if let tip = p.tip { tips.append(tip.x) }
+        }
+        #expect(scrolled == 0)
+        #expect((tips.last ?? 0) - (tips.first ?? 0) > 0.2)   // the cursor followed the finger
+    }
+
     @Test func testSlowlySlidingOntoTheKnuckleIsNotATap() {
         // Thumb comes from far away but takes 5 s to arrive (the last 4 cm alone take well over
         // the 0.6 s tap window): a slide, not a tap.

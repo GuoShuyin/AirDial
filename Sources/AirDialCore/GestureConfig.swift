@@ -215,7 +215,10 @@ public struct GestureConfig {
     /// distance of the finger; it must slide `scrollDeadZone3D` before scrolling starts.
     public var enableScroll: Bool = true
     public var scrollContact3D: Double = 0.02
-    public var scrollDeadZone3D: Double = 0.004
+    /// (4 mm accumulated was within MediaPipe's jitter: a resting thumb "scrolled" and froze the cursor.)
+    public var scrollDeadZone3D: Double = 0.012
+    /// ...as net movement within this window.
+    public var scrollStartWindow: Double = 0.4
     /// Pixels scrolled per metre of sliding (15 px per millimetre).
     public var scrollPixelsPerMetre: Double = 15000
     /// true: sliding towards the fingertip scrolls down instead of up.

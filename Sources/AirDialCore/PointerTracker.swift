@@ -18,6 +18,9 @@ public struct PointerTracker {
     public private(set) var position: Vec2?     // normalized [0, 1]², y up
     /// Smoothed fingertip in camera coordinates (frozen during a pinch), for calibrated mapping.
     public private(set) var tip: Vec2?
+    /// The same, never frozen (for calibration: a frozen tip recorded several dots identically).
+    public private(set) var liveTip: Vec2?
+    private var arcHistory: [(t: Double, arc: Double)] = []
     public private(set) var pressed = false
 
     private var range: (minX: Double, maxX: Double, minY: Double, maxY: Double)?
@@ -138,7 +141,7 @@ public struct PointerTracker {
         switch tapState {
         case .idle:
             unfreeze()
-            guard touching else { slid = 0; return nil }
+            guard touching else { arcHistory.removeAll(); return nil }
             if lifted {
                 // Which knuckle is it nearer to along the finger?
                 let right = c.enableRightClick && abs(contact.arc - arcPIP) < abs(contact.arc - leftArc)
@@ -146,9 +149,15 @@ public struct PointerTracker {
                 freeze()
                 return nil
             }
-            // Resting: only sliding along the finger does something (scroll).
-            if let last = lastArc { slid += contact.arc - last }
-            if c.enableScroll, abs(slid) >= c.scrollDeadZone3D { tapState = .scrolling; freeze(); slid = 0 }
+            // Resting: only a real slide along the finger scrolls. Net movement over a short window,
+            // so MediaPipe's jitter (which goes back and forth) never adds up to a "slide".
+            arcHistory.append((t, contact.arc))
+            while let f = arcHistory.first, t - f.t > c.scrollStartWindow { arcHistory.removeFirst() }
+            if c.enableScroll, let first = arcHistory.first, abs(contact.arc - first.arc) >= c.scrollDeadZone3D {
+                tapState = .scrolling
+                arcHistory.removeAll()
+                freeze()
+            }
             return nil
 
         case let .pending(target, arc0, since):
@@ -253,6 +262,7 @@ public struct PointerTracker {
         tipHistory.append((t, ft))
         while let first = tipHistory.first, t - first.t > c.pinchFreezeLookback { tipHistory.removeFirst() }
         self.tip = frozenTip ?? ft
+        liveTip = ft
         return event
     }
 }

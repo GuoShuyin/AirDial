@@ -20,7 +20,8 @@ public struct GestureStatus {
     public var circleEngaged = false
     public var palmArmed = false
     public var pointer: Vec2?          // normalized [0, 1]², y up; nil = not pointing
-    public var pointerTip: Vec2?       // smoothed fingertip, camera coordinates (for calibration)
+    public var pointerTip: Vec2?       // smoothed fingertip, camera coordinates (frozen while clicking)
+    public var pointerLiveTip: Vec2?   // the same, never frozen (for calibration)
     public var scroll: Double = 0      // pixels to scroll this frame (+ = up)
     public var pointerPressed = false
     public var knobDegrees: Double = 0
@@ -115,6 +116,7 @@ public final class GestureEngine {
             }
             status.pointer = activePose == .point ? pointer.position : nil
             status.pointerTip = activePose == .point ? pointer.tip : nil
+            status.pointerLiveTip = activePose == .point ? pointer.liveTip : nil
             status.scroll = activePose == .point ? pointer.scroll : 0
             status.pointerPressed = pointer.pressed
         }

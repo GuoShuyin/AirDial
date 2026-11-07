@@ -265,7 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let actions = engine.process(sample, time: time, aspect: aspect)
         if let cal = calibration, cal.isActive {
             // Calibrating: only collect fingertip positions; no cursor moves or actions.
-            cal.update(tip: engine.status.pointerTip, handVisible: engine.status.rawPose != .none, aspect: aspect, time: time)
+            cal.update(tip: engine.status.pointerLiveTip, handVisible: engine.status.rawPose != .none, aspect: aspect, time: time)
             writeLog(sample, time: time, info: info, actions: actions, note: "calibrating")
             preview?.overlay.status = engine.status
             preview?.overlay.needsDisplay = true

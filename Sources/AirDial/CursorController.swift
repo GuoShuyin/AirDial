@@ -70,7 +70,9 @@ final class CursorController {
         guard Date() >= pausedUntil else { return }
         if let last = lastPosted, hypot(target.x - last.x, target.y - last.y) < 1 { return }
         let type: CGEventType = buttonDown ? .leftMouseDragged : .mouseMoved
-        CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: target, mouseButton: .left)?.post(tap: .cghidEventTap)
+        let e = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: target, mouseButton: .left)
+        e?.flags = []
+        e?.post(tap: .cghidEventTap)
         lastPosted = target
     }
 
@@ -109,8 +111,9 @@ final class CursorController {
         let whole = Int32(scrollRemainder.rounded(.towardZero))
         guard whole != 0 else { return }
         scrollRemainder -= Double(whole)
-        CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: whole, wheel2: 0, wheel3: 0)?
-            .post(tap: .cghidEventTap)
+        let e = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: whole, wheel2: 0, wheel3: 0)
+        e?.flags = []   // a held Control turns scrolling into zoom
+        e?.post(tap: .cghidEventTap)
     }
 
     /// The pinch opened again: nothing to do, the click was already complete.
@@ -120,6 +123,7 @@ final class CursorController {
         guard let e = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: type,
                               mouseCursorPosition: p, mouseButton: button) else { return }
         e.setIntegerValueField(.mouseEventClickState, value: 1)  // a single click, as a real mouse reports it
+        e.flags = []   // never inherit a modifier (Control + click = right click)
         e.post(tap: .cghidEventTap)
     }
 }

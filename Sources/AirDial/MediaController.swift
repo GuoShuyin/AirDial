@@ -209,6 +209,20 @@ final class MediaController {
             e?.flags = flags
             e?.post(tap: .cghidEventTap)
         }
+        releaseModifiers()
+    }
+
+    /// A key event posted with modifier flags leaves those modifiers "held" in this process's
+    /// event state, so every later synthetic left click became Control+click, i.e. a right
+    /// click. Post modifier-up events right after.
+    private func releaseModifiers() {
+        let src = CGEventSource(stateID: .hidSystemState)
+        for key: CGKeyCode in [59, 55, 58, 56, 63] {   // Control, Command, Option, Shift, Fn
+            guard let e = CGEvent(keyboardEventSource: src, virtualKey: key, keyDown: false) else { continue }
+            e.type = .flagsChanged
+            e.flags = []
+            e.post(tap: .cghidEventTap)
+        }
     }
 
     /// Control + ←/→/↑: the default shortcuts "Move left/right a space" and "Mission Control".
@@ -221,6 +235,7 @@ final class MediaController {
             e?.flags = flags
             e?.post(tap: .cghidEventTap)
         }
+        releaseModifiers()
     }
 
     private func tellPlayer(_ command: String) {

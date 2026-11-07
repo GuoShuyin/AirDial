@@ -7,3 +7,4 @@ Package.resolved
 models/
 .venv
 __pycache__/
+.env

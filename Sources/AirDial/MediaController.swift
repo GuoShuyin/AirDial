@@ -133,6 +133,12 @@ final class MediaController {
     /// window also counts as full screen when it exactly covers its display. The state is set
     /// through the Accessibility API; if it hasn't changed 0.6 s later, Ctrl+Cmd+F (the toggle)
     /// is sent, which is safe then because we know the window is in the other state.
+    /// Cmd+Z in the front app (used to take back dictated text that was an agent command).
+    func undoLastEdit() {
+        guard !dryRun, hasAccessibility else { return }
+        postKey(6, [.maskCommand])
+    }
+
     private func setFrontWindowFullScreen(_ on: Bool) {
         guard var app = NSWorkspace.shared.frontmostApplication else { return }
         if app.processIdentifier == getpid() {

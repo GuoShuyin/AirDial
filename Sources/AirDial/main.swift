@@ -14,6 +14,8 @@ struct Options {
     var logPath: String?
     var tracker = "auto"        // auto | mediapipe | vision
     var calibrate = true
+    var agent = true
+    var agentWord = "AGI"
     var pythonPath: String?
     var modelPath: String?
     var config = GestureConfig()
@@ -34,6 +36,8 @@ struct Options {
       --tracker NAME      mediapipe (3D, default when installed) or vision (Apple Vision, 2D)
       --python PATH       Python with mediapipe installed (default: .venv/bin/python3, or $AIRDIAL_PYTHON)
       --model PATH        MediaPipe hand model (default: models/hand_landmarker.task)
+      --no-agent          Don't hand dictated sentences containing the trigger word to the AI agent
+      --agent-word WORD   Trigger word for the AI agent (default: AGI)
       --no-calibrate      Skip the start-up cursor calibration and reuse the last one
       --log FILE          Write per-frame diagnostics (CSV) to FILE
       --camera NAME       Use the camera whose name contains NAME
@@ -70,6 +74,10 @@ struct Options {
             case "--debug": o.debug = true
             case "--list-cameras": o.listCameras = true
             case "--no-calibrate": o.calibrate = false
+            case "--no-agent": o.agent = false
+            case "--agent-word":
+                i += 1
+                if i < args.count { o.agentWord = args[i] }
             case "--tracker":
                 i += 1
                 if i < args.count { o.tracker = args[i] }
@@ -138,6 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var lastDebugPose: HandPose?
     var log: FileHandle?
     var calibration: CalibrationController?
+    var voiceAgent: VoiceAgent?
 
     init(options: Options) {
         self.options = options
@@ -209,6 +218,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             if tracker.mediaPipe == nil { print("[AirDial] Hand tracking: Apple Vision (2D joints)") }
+
+            // Voice commands for the AI agent (needs the same Python, with `anthropic` installed).
+            if options.agent, !options.dryRun {
+                let found = MediaPipeBackend.locate(python: options.pythonPath, model: options.modelPath)
+                let agentScript = found.map { URL(fileURLWithPath: $0.script).deletingLastPathComponent()
+                    .appendingPathComponent("agent.py").path }
+                let va = VoiceAgent(python: found?.python, script: agentScript)
+                va.triggerWord = options.agentWord
+                va.undo = { [weak self] in self?.media.undoLastEdit() }
+                va.onStatus = { [weak self] s in self?.preview?.overlay.lastAction = (s, Date()) }
+                voiceAgent = va
+            }
         } catch {
             print("[AirDial] \(error.localizedDescription)")
             NSApp.terminate(nil)
@@ -278,6 +299,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .pointerPress: cursor.press()
             case .pointerRelease: cursor.release()
             case .pointerRightClick: cursor.rightClick()
+            case .fnUp:
+                media.perform(a)
+                voiceAgent?.dictationEnded()
             default: media.perform(a)
             }
         }

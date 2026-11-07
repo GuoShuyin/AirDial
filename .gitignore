@@ -5,5 +5,5 @@ xcuserdata/
 .DS_Store
 Package.resolved
 models/
-.venv/
+.venv
 __pycache__/

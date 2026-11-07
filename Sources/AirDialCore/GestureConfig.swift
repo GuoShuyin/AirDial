@@ -126,7 +126,11 @@ public struct GestureConfig {
     /// Smoothing (One Euro, in normalized screen units): low min cutoff = steady when still.
     public var pointerMinCutoff: Double = 0.4
     public var pointerBeta: Double = 4.0
-    /// Thumb tip to index tip distance / hand scale (knuckle width): below = pinched, above = open.
+    /// Which fingertip the thumb pinches to click. Middle (default) keeps the index fingertip,
+    /// and so the cursor, still while clicking; it also looks close to the thumb by accident
+    /// less often (0-2% of pointing frames vs 5-18% for the index on the recordings).
+    public var pinchFinger: Finger = .middle
+    /// Thumb tip to pinch fingertip distance / hand scale (knuckle width): below = pinched, above = open.
     /// Strict, because in 2D the fingertips often *look* close while pointing at the camera:
     /// with 0.35 and no other checks, circle recordings produced 18-37 false clicks each.
     public var pinchCloseRatio: Double = 0.18

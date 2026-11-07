@@ -9,9 +9,9 @@ import Foundation
 /// move: reaching your furthest comfortable point to the right takes the pointer to the right
 /// edge of the rightmost screen.
 ///
-/// Pinch: thumb tip close to index tip (relative to the size of the hand) presses the button,
-/// opening them releases it. Pinching moves the index tip, so the pointer freezes at where it
-/// was just before the pinch started.
+/// Pinch: thumb tip close to the middle fingertip (or the index, see `pinchFinger`; relative to
+/// the size of the hand) presses the button, opening them releases it. The pointer freezes at
+/// where it was just before the pinch started, in case the pinch moves the index tip.
 public struct PointerTracker {
     public enum Event: Equatable { case press, release }
 
@@ -67,8 +67,9 @@ public struct PointerTracker {
             if let last = lastPalm, t > last.t { speed = palm.distance(to: last.p) / (t - last.t) }
             lastPalm = (t, palm)
         }
-        if let thumb = s.thumbTip, s.thumbConfidence >= c.pinchMinThumbConfidence, let scale = PointerTracker.handScale(s) {
-            let d = thumb.distance(to: tip) / scale
+        if let thumb = s.thumbTip, s.thumbConfidence >= c.pinchMinThumbConfidence, let scale = PointerTracker.handScale(s),
+           let pinchTip = s.tip(c.pinchFinger) {
+            let d = thumb.distance(to: pinchTip) / scale
             // In between the two thresholds neither counter moves: a single slightly-off frame
             // in the middle of a pinch must not restart it.
             if d < c.pinchCloseRatio, pressed || speed < c.pinchMaxSpeed { closedFrames += 1; openFrames = 0 }

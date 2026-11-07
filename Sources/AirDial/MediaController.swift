@@ -104,11 +104,15 @@ final class MediaController {
         send(down: false)
     }
 
-    /// Puts the front window into / out of full screen. Sets the state explicitly through the
-    /// Accessibility API (AXFullScreen) instead of the Ctrl+Cmd+F toggle, so "enter" never exits
-    /// and "exit" never enters. Falls back to the toggle only when the state can be read but not set.
+    /// Puts the front window into / out of full screen.
+    ///
+    /// Some apps (e.g. Chromium / Electron based ones) report `AXFullScreen` unreliably, so the
+    /// window also counts as full screen when it exactly covers its display. The state is set
+    /// through the Accessibility API; if it hasn't changed 0.6 s later, Ctrl+Cmd+F (the toggle)
+    /// is sent, which is safe then because we know the window is in the other state.
     private func setFrontWindowFullScreen(_ on: Bool) {
         guard let app = NSWorkspace.shared.frontmostApplication else { return }
+        let name = app.localizedName ?? "front app"
         guard app.processIdentifier != getpid() else {
             print("[AirDial] The AirDial preview is the front window; click into the app you want first.")
             return
@@ -117,17 +121,48 @@ final class MediaController {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &value) == .success,
               let windowRef = value, CFGetTypeID(windowRef) == AXUIElementGetTypeID() else {
-            print("[AirDial] No focused window in \(app.localizedName ?? "the front app").")
+            print("[AirDial] Full screen: no focused window in \(name).")
             return
         }
         let window = windowRef as! AXUIElement
-        let attr = "AXFullScreen" as CFString
-        var current: CFTypeRef?
-        let readable = AXUIElementCopyAttributeValue(window, attr, &current) == .success
-        let isFull = (current as? Bool) ?? false
-        if readable, isFull == on { return }  // already in the requested state
-        if AXUIElementSetAttributeValue(window, attr, (on ? kCFBooleanTrue : kCFBooleanFalse)!) == .success { return }
-        if readable { postKey(3, [.maskCommand, .maskControl]) }  // Ctrl+Cmd+F toggles; we know it's the other state
+        let (ax, covers) = fullScreenState(window)
+        let isFull = (ax ?? false) || covers
+        let axText = ax.map { $0 ? "yes" : "no" } ?? "unreadable"
+        guard isFull != on else {
+            print("[AirDial] Full screen: \(name) already \(on ? "full screen" : "windowed") (AXFullScreen \(axText), covers display \(covers)).")
+            return
+        }
+        let set = AXUIElementSetAttributeValue(window, "AXFullScreen" as CFString, (on ? kCFBooleanTrue : kCFBooleanFalse)!)
+        print("[AirDial] Full screen: \(name) \(on ? "enter" : "exit") (AXFullScreen \(axText), covers display \(covers), set result \(set.rawValue)).")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            let (ax2, covers2) = self?.fullScreenState(window) ?? (nil, false)
+            let nowFull = (ax2 ?? false) || covers2
+            if nowFull != on {
+                print("[AirDial] Full screen: \(name) didn't change; sending Ctrl+Cmd+F.")
+                self?.postKey(3, [.maskCommand, .maskControl])
+            }
+        }
+    }
+
+    /// (AXFullScreen if readable, whether the window exactly covers a display).
+    private func fullScreenState(_ window: AXUIElement) -> (Bool?, Bool) {
+        var fs: CFTypeRef?
+        let ax: Bool? = AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &fs) == .success ? (fs as? Bool) : nil
+        var posRef: CFTypeRef?, sizeRef: CFTypeRef?
+        var pos = CGPoint.zero, size = CGSize.zero
+        guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &posRef) == .success,
+              AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef) == .success,
+              let p = posRef, let z = sizeRef,
+              AXValueGetValue(p as! AXValue, .cgPoint, &pos), AXValueGetValue(z as! AXValue, .cgSize, &size) else {
+            return (ax, false)
+        }
+        // Display frames in global (top-left origin) coordinates, like AX positions.
+        let mainHeight = NSScreen.screens.first?.frame.height ?? 0
+        let covers = NSScreen.screens.contains { s in
+            let f = CGRect(x: s.frame.minX, y: mainHeight - s.frame.maxY, width: s.frame.width, height: s.frame.height)
+            return abs(f.minX - pos.x) <= 2 && abs(f.minY - pos.y) <= 2 && abs(f.width - size.width) <= 2 && abs(f.height - size.height) <= 2
+        }
+        return (ax, covers)
     }
 
     private func postKey(_ key: CGKeyCode, _ flags: CGEventFlags) {

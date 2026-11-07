@@ -19,7 +19,7 @@ struct Options {
 
       ☝️  Index finger, draw a circle   clockwise = volume up, counter-clockwise = volume down
       🖐→✊ Close your open hand          front window exits full screen;  ✊→🖐 open it: full screen
-      ☝️  Index finger, point           moves the mouse cursor (all displays); pinch thumb + index = click
+      ☝️  Index finger, point           moves the mouse cursor (all displays); pinch thumb + middle finger = click
       ✌️  Two fingers (V), swipe        up or down = next track (right / left = next / previous)
       🖐  Open palm facing the camera, swipe   sideways = switch desktop, up or down = Mission Control on/off
 
@@ -38,6 +38,7 @@ struct Options {
       --no-desktops       Disable open-palm swipes (desktops and Mission Control)
       --no-mission-control  Disable open-palm up/down = Mission Control
       --no-hand-shapes    Disable fist = exit full screen, open hand = full screen
+      --pinch-index       Click by pinching thumb + index (default: thumb + middle finger)
       --no-cursor         Don't move the mouse cursor with the index finger
       --palm-hold         Strict: hold the open palm still for a moment before it can swipe
       --palm-follows      Palm right = desktop on the right (default: palm right = desktop on the left)
@@ -71,6 +72,7 @@ struct Options {
             case "--palm-follows": o.config.palmRightGoesLeft = false
             case "--palm-hold": o.config.palmRequireHold = true
             case "--no-cursor": o.config.enablePointer = false
+            case "--pinch-index": o.config.pinchFinger = .index
             case "--no-hand-shapes": o.config.enableHandShapes = false
             case "--sensitivity":
                 i += 1

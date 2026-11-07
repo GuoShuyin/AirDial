@@ -3,19 +3,20 @@ import Foundation
 import Testing
 @testable import AirDialCore
 
-/// A pointing hand (index extended) with the index tip at `tip`, thumb tip `thumbOffset` away
-/// from the index tip, palm width 0.15.
-private func pointingHand(tip: Vec2, thumbOffset: Vec2 = Vec2(0.12, -0.12), time: Double, thumbConfidence: Float = 0.9) -> HandSample {
+/// A pointing hand (index extended) with the index tip at `tip`, the thumb tip `thumbOffset` away
+/// from the tip of `pinchFinger` (middle by default), palm width 0.15.
+private func pointingHand(tip: Vec2, thumbOffset: Vec2 = Vec2(0.12, -0.12), time: Double, thumbConfidence: Float = 0.9,
+                          pinchFinger: Finger = .middle) -> HandSample {
     let wrist = tip - Vec2(0, 0.25)
     func j(_ dx: Double, extended: Bool) -> HandSample.FingerJoints {
         .init(tip: Vec2(wrist.x + dx, wrist.y + (extended ? 0.25 : 0.08)),
               pip: Vec2(wrist.x + dx, wrist.y + (extended ? 0.15 : 0.12)),
               mcp: Vec2(wrist.x + dx, wrist.y + 0.09))
     }
-    return HandSample(time: time, wrist: wrist,
-                      fingers: [.index: j(0, extended: true), .middle: j(0.05, extended: false),
-                                .ring: j(0.10, extended: false), .little: j(0.15, extended: false)],
-                      thumbTip: tip + thumbOffset, thumbConfidence: thumbConfidence)
+    let fingers: [Finger: HandSample.FingerJoints] = [.index: j(0, extended: true), .middle: j(0.05, extended: false),
+                                                      .ring: j(0.10, extended: false), .little: j(0.15, extended: false)]
+    return HandSample(time: time, wrist: wrist, fingers: fingers,
+                      thumbTip: fingers[pinchFinger]!.tip! + thumbOffset, thumbConfidence: thumbConfidence)
 }
 
 struct PointerTests {
@@ -76,7 +77,7 @@ struct PointerTests {
         }
         for _ in 0..<20 { step(Vec2(0.12, -0.12)) }          // pointing, thumb away
         let before = p.position!
-        for _ in 0..<8 { step(Vec2(0.01, -0.01), tip: Vec2(0.68, 0.47)) }  // pinch: index tip dips
+        for _ in 0..<8 { step(Vec2(0.01, -0.01), tip: Vec2(0.69, 0.49)) }  // pinch: the hand shifts a little
         #expect(events == [.press])
         #expect(p.position!.distance(to: before) < 0.02)       // frozen where it was before the pinch
         for _ in 0..<5 { step(Vec2(0.12, -0.12)) }            // open again
@@ -92,6 +93,18 @@ struct PointerTests {
             let a = 2 * Double.pi * t
             let tip = Vec2(0.66 + 0.12 * cos(a), 0.5 + 0.12 * sin(a))
             if let e = p.update(pointingHand(tip: tip, thumbOffset: Vec2(0.01, -0.01), time: t), time: t, aspect: 4.0 / 3.0) { events.append(e) }
+        }
+        #expect(events.isEmpty)
+    }
+
+    @Test func testThumbTouchingTheIndexIsNotAClickByDefault() {
+        // The default click is thumb + middle finger; the thumb resting on the index tip isn't one.
+        var p = PointerTracker()
+        var events: [PointerTracker.Event] = []
+        for i in 0..<30 {
+            let t = Double(i) / 30
+            if let e = p.update(pointingHand(tip: Vec2(0.7, 0.5), thumbOffset: Vec2(0.01, -0.01), time: t, pinchFinger: .index),
+                                time: t, aspect: 4.0 / 3.0) { events.append(e) }
         }
         #expect(events.isEmpty)
     }

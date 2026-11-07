@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>dev.airdial.AirDial</string>
+    <key>CFBundleName</key>
+    <string>AirDial</string>
+    <key>NSCameraUsageDescription</key>
+    <string>AirDial uses the camera to recognize hand gestures for controlling music.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>AirDial controls Music / Spotify playback when media keys are unavailable.</string>
+</dict>
+</plist>

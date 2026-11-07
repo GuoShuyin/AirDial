@@ -28,10 +28,56 @@ private func hand3D(thumb: Vec3, time: Double, indexTip2D: Vec2 = Vec2(0.7, 0.5)
                       thumbTip: wrist2 + Vec2(0, 0.1), thumbConfidence: 0.9, world: w)
 }
 
+/// A 3D thumbs-up: all four fingers curled, the thumb straight and away from them.
+private func thumbsUp3D(time: Double, indexTip2D: Vec2) -> HandSample {
+    var s = hand3D(thumb: Vec3(-0.06, 0.04, 0), time: time, indexTip2D: indexTip2D)
+    var w = s.world!
+    // Curl the index too.
+    w[5] = Vec3(-0.025, 0, 0); w[6] = Vec3(-0.025, 0.03, -0.01); w[7] = Vec3(-0.025, 0.025, -0.035); w[8] = Vec3(-0.025, 0.005, -0.035)
+    // Thumb straight up and out, CMC -> MCP -> IP -> tip in a line; its tip ~5 cm from the index
+    // finger's middle joint (measured on a real thumbs-up: ~7 cm; tucked: ~3 cm).
+    w[1] = Vec3(-0.04, -0.06, 0); w[2] = Vec3(-0.05, -0.025, 0.003); w[3] = Vec3(-0.06, 0.01, 0.006); w[4] = Vec3(-0.07, 0.045, 0.01)
+    s.world = w
+    return s
+}
+
 struct Hand3DTests {
     let middleDIP = Vec3(-0.005, 0.025, -0.035)   // first knuckle, by the fingertip: left click
     let middlePIP = Vec3(-0.005, 0.03, -0.01)     // second knuckle: right click
     let away = Vec3(-0.08, -0.02, -0.02)
+
+    @Test func testThumbsUpIsRecognisedWithoutPointingUp() {
+        let c = GestureConfig()
+        #expect(PoseClassifier.classify(thumbsUp3D(time: 0, indexTip2D: Vec2(0.6, 0.5)), config: c) == .thumbsUp)
+        // Tilt the whole hand 70 degrees sideways (thumb no longer "up" for the camera): still a thumbs-up.
+        var s = thumbsUp3D(time: 0, indexTip2D: Vec2(0.6, 0.5))
+        let a = 70 * Double.pi / 180
+        s.world = s.world!.map { Vec3($0.x * cos(a) - $0.y * sin(a), $0.x * sin(a) + $0.y * cos(a), $0.z) }
+        #expect(PoseClassifier.classify(s, config: c) == .thumbsUp)
+    }
+
+    @Test func testSwitchingFromPointingToThumbsUpLeavesTheCursorWhereYouPointed() {
+        let e = GestureEngine()
+        var t = 0.0
+        var pointed: Vec2?
+        while t < 1.0 {   // point, steady at x = 0.6
+            _ = e.process(hand3D(thumb: Vec3(-0.08, -0.02, -0.02), time: t, indexTip2D: Vec2(0.6, 0.5)), time: t)
+            pointed = e.status.pointer
+            t += 1.0 / 30
+        }
+        var last: Vec2?
+        var actions: [GestureAction] = []
+        var k = 0
+        while t < 2.0 {   // the hand drifts to x = 0.8 while turning into a thumbs-up
+            let x = 0.6 + min(Double(k) / 10, 1) * 0.2
+            actions += e.process(thumbsUp3D(time: t, indexTip2D: Vec2(x, 0.5)), time: t)
+            if let p = e.status.pointer { last = p }
+            t += 1.0 / 30
+            k += 1
+        }
+        #expect(actions.contains(.fnDown))
+        #expect(last!.distance(to: pointed!) < 0.03, "\(String(describing: last)) vs \(String(describing: pointed))")
+    }
 
     @Test func testBendDecidesFingerState() {
         let s = hand3D(thumb: away, time: 0)

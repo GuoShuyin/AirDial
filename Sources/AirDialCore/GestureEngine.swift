@@ -47,6 +47,8 @@ public final class GestureEngine {
     private var palmSwipe = SwipeDetector()
     private var pointer: PointerTracker
     private var knob = KnobTracker()
+    // Cursor hold while the hand turns from pointing into a thumbs-up.
+    private var holdPointer: (position: Vec2?, tip: Vec2?)?
     private var fingersTogether = false
     private var handShape = HandShapeTransition()
     private var handShapeBlockedUntil: Double = -.infinity
@@ -73,7 +75,9 @@ public final class GestureEngine {
     /// Feed one camera frame. `sample` is nil when no hand was detected.
     /// `aspect` = camera frame width / height (sample x coordinates run from 0 to aspect).
     public func process(_ sample: HandSample?, time: Double, aspect: Double = 4.0 / 3.0) -> [GestureAction] {
-        let raw = PoseClassifier.classify(sample, config: config)
+        var raw = PoseClassifier.classify(sample, config: config)
+        // While a thumbs-up is held, keep it until the thumb is clearly tucked or bent (hysteresis).
+        if activePose == .thumbsUp, raw == .fist, let s = sample, s.thumbIsOut(config, held: true) { raw = .thumbsUp }
         status.rawPose = raw
         let before = activePose
         updatePose(raw, time: time)
@@ -114,8 +118,16 @@ public final class GestureEngine {
             } else if activePose != .point, status.pointer != nil || pointer.pressed {
                 if pointer.reset() == .release { actions.append(.pointerRelease) }
             }
-            status.pointer = activePose == .point ? pointer.position : nil
-            status.pointerTip = activePose == .point ? pointer.tip : nil
+            // Turning from pointing into a thumbs-up (to talk) moves the hand: as soon as a thumbs-up
+            // shape shows up, hold the cursor where it was just before the hand started to change.
+            if activePose == .point, raw == .thumbsUp {
+                if holdPointer == nil { holdPointer = pointer.recent(ago: config.thumbsUpCursorRewind, now: time) }
+            } else if raw == .point || activePose != .point {
+                if activePose != .thumbsUp { holdPointer = nil }
+            }
+            let held = holdPointer
+            status.pointer = activePose == .point ? (held?.position ?? pointer.position) : nil
+            status.pointerTip = activePose == .point ? (held?.tip ?? pointer.tip) : nil
             status.pointerLiveTip = activePose == .point ? pointer.liveTip : nil
             status.scroll = activePose == .point ? pointer.scroll : 0
             status.pointerPressed = pointer.pressed
@@ -304,7 +316,8 @@ public final class GestureEngine {
             switchNow = candidateCount >= need
         } else {
             // Leaving a gesture pose is slower: tolerate a few misread frames mid-gesture.
-            switchNow = time - lastActiveSeen > config.poseDropSeconds
+            let drop = activePose == .thumbsUp ? config.thumbsUpReleaseSeconds : config.poseDropSeconds
+            switchNow = time - lastActiveSeen > drop
         }
         if switchNow {
             activePose = raw

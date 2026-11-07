@@ -10,10 +10,19 @@ public struct GestureConfig {
     public var bendExtendedMax: Double = 60
     /// ...and more than this is curled.
     public var bendCurledMin: Double = 100
-    /// 3D thumbs-up: thumb tip at least this far from the index knuckle and this much higher
-    /// than the thumb's own middle joint (metres).
-    public var thumbsUpOut3D: Double = 0.05
-    public var thumbsUpRise3D: Double = 0.025
+    /// 3D thumbs-up: fist with the thumb straight (bend < `thumbsUpMaxBend`) and its tip at least
+    /// `thumbsUpMinDistance` from the index finger's middle joint. Measured: thumbs-up 23 degrees /
+    /// 7 cm, tucked thumb 3 cm. Released (Fn up) once the tip is back within
+    /// `thumbsUpReleaseDistance` or the thumb bends past `thumbsUpReleaseBend`.
+    public var thumbsUpMaxBend: Double = 45
+    public var thumbsUpMinDistance: Double = 0.045
+    public var thumbsUpReleaseBend: Double = 60
+    public var thumbsUpReleaseDistance: Double = 0.035
+    /// When pointing turns into a thumbs-up, the cursor goes back to where it was this long before
+    /// the first thumbs-up frame, and stays there until you point again.
+    public var thumbsUpCursorRewind: Double = 0.3
+    /// Seconds after the thumbs-up ends before Fn is released (other poses use poseDropSeconds).
+    public var thumbsUpReleaseSeconds: Double = 0.2
     /// Frames in a row before a thumbs-up counts (0.3 s): a stray Fn press can open the emoji picker.
     public var thumbsUpConfirmFrames: Int = 9
     /// Thumbs-up holds the Fn / Globe key while it lasts.

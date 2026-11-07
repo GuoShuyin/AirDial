@@ -75,6 +75,14 @@ public struct PointerTracker {
         return wasPressed ? .release : nil
     }
 
+    /// Where the pointer was `ago` seconds before `now` (the oldest kept sample if older): to put
+    /// the cursor back to where it was before the hand started changing shape.
+    public func recent(ago: Double, now: Double) -> (position: Vec2?, tip: Vec2?) {
+        let p = history.first(where: { now - $0.t <= ago })?.p ?? history.first?.p
+        let tp = tipHistory.first(where: { now - $0.t <= ago })?.p ?? tipHistory.first?.p
+        return (p, tp)
+    }
+
     /// Closest point on a polyline: (distance, arc length from the first point).
     static func closest(_ p: Vec3, on pts: [Vec3]) -> (d: Double, arc: Double) {
         var best = (d: Double.infinity, arc: 0.0)
@@ -254,13 +262,13 @@ public struct PointerTracker {
         let p = filter.filter(raw, time: t)
 
         history.append((t, p))
-        while let first = history.first, t - first.t > c.pinchFreezeLookback { history.removeFirst() }
+        while let first = history.first, t - first.t > max(c.pinchFreezeLookback, 1.0) { history.removeFirst() }
 
         position = frozenAt ?? p
 
         let ft = tipFilter.filter(tip, time: t)
         tipHistory.append((t, ft))
-        while let first = tipHistory.first, t - first.t > c.pinchFreezeLookback { tipHistory.removeFirst() }
+        while let first = tipHistory.first, t - first.t > max(c.pinchFreezeLookback, 1.0) { tipHistory.removeFirst() }
         self.tip = frozenTip ?? ft
         liveTip = ft
         return event

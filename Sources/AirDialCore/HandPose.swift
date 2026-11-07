@@ -149,10 +149,9 @@ extension PoseClassifier {
               let br = s.bend(.ring), let bl = s.bend(.little) else { return nil }
         let othersCurled = bm >= c.bendCurledMin && br >= c.bendCurledMin - 10 && bl >= c.bendCurledMin - 10
         if bi >= c.bendCurledMin, othersCurled {
-            // A fist; with the thumb sticking out upwards it's a thumbs-up.
-            let thumbOut = w[4].distance(to: w[5]) >= c.thumbsUpOut3D
-            let thumbUp = w[4].y - w[2].y >= c.thumbsUpRise3D
-            return thumbOut && thumbUp ? .thumbsUp : .fist
+            // A fist; with the thumb straight and away from the curled fingers it's a thumbs-up.
+            // No "pointing up" test: "up" was the camera's up, which fails as soon as the hand tilts.
+            return s.thumbIsOut(c) ? .thumbsUp : .fist
         }
         // Pointing down / towards the camera bends the index in the estimate (~90 degrees at the
         // camera display's bottom corners) while the other fingers stay curled: still pointing.
@@ -162,6 +161,21 @@ extension PoseClassifier {
 }
 
 extension HandSample {
+    /// 3D: the thumb's bend (angle at its MCP + IP joints, degrees).
+    public var thumbBend: Double? {
+        guard let w = world else { return nil }
+        return (w[2] - w[1]).angle(to: w[3] - w[2]) + (w[3] - w[2]).angle(to: w[4] - w[3])
+    }
+    /// 3D: thumb tip to the index finger's middle joint (a tucked thumb lies right on it).
+    public var thumbToIndexPIP: Double? { world.map { $0[4].distance(to: $0[6]) } }
+
+    /// 3D: thumb sticking out of a fist (thumbs-up shape). `held` uses the looser release limits.
+    public func thumbIsOut(_ c: GestureConfig, held: Bool = false) -> Bool {
+        guard let b = thumbBend, let d = thumbToIndexPIP else { return false }
+        return held ? (b < c.thumbsUpReleaseBend && d >= c.thumbsUpReleaseDistance)
+                    : (b < c.thumbsUpMaxBend && d >= c.thumbsUpMinDistance)
+    }
+
     /// Mean of the fingertips: moves much more than the palm centre in a quick wrist flick.
     public var fingertipCenter: Vec2? {
         let tips = Finger.allCases.compactMap { fingers[$0]?.tip }

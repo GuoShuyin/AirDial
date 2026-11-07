@@ -18,7 +18,7 @@ struct CalibrationTests {
         let order = [1, 0, 2]   // left to right
         let tipXCentre = [0.70, 0.45, 0.94], tipYCentre = [0.55, 0.45, 0.65]
         var samples: [PointerCalibration.Sample] = []
-        for t in PointerCalibration.targets(screenCount: 3, order: order) {
+        for t in PointerCalibration.targets(screenCount: 3, order: order, centresOnly: true) {
             let y = t.y == 0.5 ? tipYCentre[t.screen] : 0.55 + (0.5 - t.y) / 0.35 * 0.15
             samples.append(.init(screen: t.screen, targetX: t.x, targetY: t.y, tip: Vec2(tipXCentre[t.screen], y)))
         }
@@ -52,12 +52,13 @@ struct CalibrationTests {
         let c = fakeCalibration()
         #expect(c.isValid(for: screens))
         #expect(!c.isValid(for: Array(screens.prefix(2))))
-        #expect(PointerCalibration.targets(screenCount: 3, order: [1, 0, 2]).count == 5)
+        #expect(PointerCalibration.targets(screenCount: 3, order: [1, 0, 2], centresOnly: true).count == 5)
+        #expect(PointerCalibration.targets(screenCount: 3, order: [1, 0, 2]).count == 15)
     }
 
     @Test func testTheCameraDisplayGetsCornersAndItsOwnMapping() {
         // MacBook (index 1) has the camera: 5 dots there, centres elsewhere, main top/bottom.
-        let targets = PointerCalibration.targets(screenCount: 3, order: [1, 0, 2], detailed: 1)
+        let targets = PointerCalibration.targets(screenCount: 3, order: [1, 0, 2], detailed: 1, centresOnly: true)
         #expect(targets.filter { $0.screen == 1 }.count == 5)
         #expect(targets.count == 9)
         // A tilted fingertip grid on the MacBook (perspective): x also shifts with height.
@@ -76,6 +77,32 @@ struct CalibrationTests {
         let p = c.point(for: Vec2(0.40 + 0.09 + 0.027, 0.50 - 0.135))!
         #expect(abs(p.x - (-1512 + 0.9 * 1512)) < 10)
         #expect(abs(p.y - (681 + 0.9 * 982)) < 10)
+    }
+
+    @Test func testAnAngledDisplayIsMappedWithPerspective() {
+        // Every display: centre + 4 corners. Fingertip -> target fraction follows a perspective
+        // transform per display (the right one strongly angled towards the user).
+        func project(_ s: Int, _ u: Double, _ v: Double) -> Vec2 {
+            switch s {
+            case 1: return Vec2(0.40 + 0.10 * u, 0.55 - 0.20 * v)                       // MacBook, flat
+            case 0: return Vec2(0.55 + 0.30 * u, 0.70 - 0.30 * v)                       // main, flat
+            default:                                                                    // right, angled:
+                let w = 1 + 0.4 * u                                                     // a true perspective map
+                return Vec2((0.88 + 0.45 * u) / w, (0.62 - 0.25 * v + 0.1 * u) / w)
+            }
+        }
+        var samples: [PointerCalibration.Sample] = []
+        for t in PointerCalibration.targets(screenCount: 3, order: [1, 0, 2]) {
+            samples.append(.init(screen: t.screen, targetX: t.x, targetY: t.y, tip: project(t.screen, t.x, t.y)))
+        }
+        let c = PointerCalibration(samples: samples, screens: screens)
+        // An uncalibrated spot on the angled display: 30% across, 70% down.
+        let p = c.point(for: project(2, 0.3, 0.7))!
+        let want = CGPoint(x: 3440 + 0.3 * 2560, y: -605 + 0.7 * 1440)
+        #expect(abs(p.x - want.x) < 15 && abs(p.y - want.y) < 15, "\(p) vs \(want)")
+        // And one on the main display.
+        let q = c.point(for: project(0, 0.65, 0.4))!
+        #expect(abs(q.x - 0.65 * 3440) < 15 && abs(q.y - 0.4 * 1440) < 15, "\(q)")
     }
 
     @Test func testCalibrationRoundTripsThroughJSON() throws {

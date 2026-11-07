@@ -37,24 +37,76 @@ public struct PointerCalibration: Codable, Equatable {
         self.screens = screens
     }
 
-    /// The targets to show: the centre of every display, plus the top and bottom centre of the
-    /// main display (index 0) for the vertical scale. Fractions of the display, x right, y down.
-    /// `detailed` (the display with the camera, where pointing is hardest) also gets its four
-    /// corners, and then has its own full 2D mapping.
-    public static func targets(screenCount: Int, order: [Int], detailed: Int? = nil) -> [(screen: Int, x: Double, y: Double)] {
+    /// The targets to show, display by display in `order` (left to right): the centre and the
+    /// four corners of each, so every display gets its own perspective mapping (side displays may
+    /// be angled towards you or flat). With `centresOnly`, just the centres plus the main
+    /// display's top and bottom centre (quick, less accurate). Fractions, x right, y down.
+    public static func targets(screenCount: Int, order: [Int], detailed: Int? = nil, centresOnly: Bool = false)
+        -> [(screen: Int, x: Double, y: Double)] {
         var t: [(screen: Int, x: Double, y: Double)] = []
         for s in order {
-            if s == detailed {
-                t += [(s, 0.5, 0.5), (s, 0.1, 0.1), (s, 0.9, 0.1), (s, 0.9, 0.9), (s, 0.1, 0.9)]
-            } else {
+            if centresOnly && s != detailed {
                 t.append((s, 0.5, 0.5))
+            } else {
+                t += [(s, 0.5, 0.5), (s, 0.1, 0.1), (s, 0.9, 0.1), (s, 0.9, 0.9), (s, 0.1, 0.9)]
             }
         }
-        if screenCount > 0, detailed != 0 {
+        if centresOnly, screenCount > 0, detailed != 0 {
             t.append((screen: 0, x: 0.5, y: 0.15))
             t.append((screen: 0, x: 0.5, y: 0.85))
         }
         return t
+    }
+
+    /// Perspective (homography) map fingertip -> global point from a display's own samples, if
+    /// it has at least 4 spread out (corners). A homography is exactly how a flat display maps
+    /// when seen at an angle; falls back to affine if the fit is degenerate.
+    private func homography(for screen: Int) -> ((Vec2) -> CGPoint)? {
+        let own = samples.filter { $0.screen == screen }
+        guard own.count >= 4, Set(own.map { $0.targetX }).count >= 2, Set(own.map { $0.targetY }).count >= 2 else { return nil }
+        let r = screens[screen]
+        // Normalize fingertip coordinates for numerical stability.
+        let mx = own.map { $0.tipX }.reduce(0, +) / Double(own.count), my = own.map { $0.tipY }.reduce(0, +) / Double(own.count)
+        let sc = max(own.map { abs($0.tipX - mx) + abs($0.tipY - my) }.max() ?? 1, 1e-6)
+        // Unknowns h0..h7 (h8 = 1): u = (h0 x + h1 y + h2) / (h6 x + h7 y + 1), v likewise with h3..h5,
+        // u, v = target fractions. Linear least squares on the 2N equations.
+        var ata = [[Double]](repeating: [Double](repeating: 0, count: 8), count: 8)
+        var atb = [Double](repeating: 0, count: 8)
+        for s in own {
+            let x = (s.tipX - mx) / sc, y = (s.tipY - my) / sc, u = s.targetX, v = s.targetY
+            let rows: [([Double], Double)] = [([x, y, 1, 0, 0, 0, -u * x, -u * y], u), ([0, 0, 0, x, y, 1, -v * x, -v * y], v)]
+            for (a, b) in rows {
+                for i in 0..<8 {
+                    for j in 0..<8 { ata[i][j] += a[i] * a[j] }
+                    atb[i] += a[i] * b
+                }
+            }
+        }
+        // Light ridge so 4-5 points with noise stay well-posed.
+        for i in 0..<8 { ata[i][i] += 1e-6 }
+        guard let h = PointerCalibration.solve(ata, atb) else { return affine(for: screen) }
+        return { tip in
+            let x = (tip.x - mx) / sc, y = (tip.y - my) / sc
+            let w = h[6] * x + h[7] * y + 1
+            guard abs(w) > 1e-6 else { return CGPoint(x: r.midX, y: r.midY) }
+            let u = (h[0] * x + h[1] * y + h[2]) / w, v = (h[3] * x + h[4] * y + h[5]) / w
+            return CGPoint(x: Double(r.minX) + u * Double(r.width), y: Double(r.minY) + v * Double(r.height))
+        }
+    }
+
+    /// Gaussian elimination with partial pivoting.
+    static func solve(_ a: [[Double]], _ b: [Double]) -> [Double]? {
+        let n = b.count
+        var m = a.enumerated().map { $0.element + [b[$0.offset]] }
+        for col in 0..<n {
+            guard let p = (col..<n).max(by: { abs(m[$0][col]) < abs(m[$1][col]) }), abs(m[p][col]) > 1e-12 else { return nil }
+            m.swapAt(col, p)
+            for r in 0..<n where r != col {
+                let f = m[r][col] / m[col][col]
+                for k in col...n { m[r][k] -= f * m[col][k] }
+            }
+        }
+        return (0..<n).map { m[$0][n] / m[$0][$0] }
     }
 
     /// Least-squares affine map fingertip -> global point from a display's own samples, if it has
@@ -103,15 +155,19 @@ public struct PointerCalibration: Codable, Equatable {
     public func point(for tip: Vec2) -> CGPoint? {
         guard !samples.isEmpty, !screens.isEmpty else { return nil }
 
-        // A display with its own full (corner) calibration claims the points that map onto it.
+        // Displays with their own full (corner) calibration claim the points that map onto them;
+        // if several do (near a shared edge), the one where the point is deepest inside wins.
+        var best: (depth: Double, p: CGPoint)?
         for i in screens.indices {
-            guard let map = affine(for: i) else { continue }
+            guard let map = homography(for: i) else { continue }
             let p = map(tip), r = screens[i]
-            let mx = r.width * 0.02, my = r.height * 0.02
-            if p.x >= r.minX - mx, p.x < r.maxX + mx, p.y >= r.minY - my, p.y < r.maxY + my {
-                return CGPoint(x: min(max(p.x, r.minX), r.maxX - 1), y: min(max(p.y, r.minY), r.maxY - 1))
+            let depth = min(Double(p.x - r.minX) / Double(r.width), Double(r.maxX - p.x) / Double(r.width),
+                            Double(p.y - r.minY) / Double(r.height), Double(r.maxY - p.y) / Double(r.height))
+            if depth > -0.02, depth > (best?.depth ?? -.infinity) {
+                best = (depth, CGPoint(x: min(max(p.x, r.minX), r.maxX - 1), y: min(max(p.y, r.minY), r.maxY - 1)))
             }
         }
+        if let b = best { return b.p }
 
         // Horizontal: piecewise linear through the display centres (horizontally centred
         // samples), sorted by fingertip x. Samples that would make the curve run backwards

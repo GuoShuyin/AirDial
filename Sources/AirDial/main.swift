@@ -232,15 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if options.config.enablePointer {
             if options.calibrate && !options.dryRun {
-                let c = CalibrationController(screens: cursor.screens) { [weak self] result in
-                    if let r = result { self?.cursor.calibration = r }
-                    else if let saved = CalibrationController.loadSaved(for: self?.cursor.screens ?? []) {
-                        self?.cursor.calibration = saved
-                        print("[AirDial] Using the last saved calibration.")
-                    }
-                }
-                calibration = c
-                c.start()
+                startCalibration()
             } else if let saved = CalibrationController.loadSaved(for: cursor.screens) {
                 cursor.calibration = saved
                 print("[AirDial] Cursor: using the saved calibration.")
@@ -249,11 +241,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         print("[AirDial] Running. ☝️ point = cursor, 🤞 circle = volume, ✌️ swipe = next track, 🖐 swipe = desktops." + (options.headless ? " Ctrl+C to quit." : ""))
     }
 
+    @objc func startCalibration() {
+        guard calibration?.isActive != true else { return }
+        cursor.reloadScreens()
+        let c = CalibrationController(screens: cursor.screens) { [weak self] result in
+            if let r = result { self?.cursor.calibration = r }
+            else if let saved = CalibrationController.loadSaved(for: self?.cursor.screens ?? []) {
+                self?.cursor.calibration = saved
+                print("[AirDial] Using the last saved calibration.")
+            }
+        }
+        calibration = c
+        c.start()
+    }
+
     private func handle(_ sample: HandSample?, time: Double, aspect: Double, info: FrameInfo) {
         let actions = engine.process(sample, time: time, aspect: aspect)
         if let cal = calibration, cal.isActive {
             // Calibrating: only collect fingertip positions; no cursor moves or actions.
-            cal.update(tip: engine.status.pointerTip, time: time)
+            cal.update(tip: engine.status.pointerTip, handVisible: engine.status.rawPose != .none, time: time)
             preview?.overlay.status = engine.status
             preview?.overlay.needsDisplay = true
             return
@@ -337,6 +343,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appItem = NSMenuItem()
         main.addItem(appItem)
         let appMenu = NSMenu()
+        let recal = NSMenuItem(title: "Recalibrate Cursor", action: #selector(startCalibration), keyEquivalent: "r")
+        recal.target = self
+        appMenu.addItem(recal)
         appMenu.addItem(withTitle: "Quit AirDial", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         NSApp.mainMenu = main

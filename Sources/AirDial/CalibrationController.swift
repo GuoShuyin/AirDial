@@ -14,7 +14,10 @@ final class CalibrationController {
     private var index = 0
     private var samples: [PointerCalibration.Sample] = []
     private var steady: [(t: Double, p: Vec2)] = []
-    private var targetStart: Double?
+    private var visibleTime = 0.0          // time with a hand in view on the current dot
+    private var lastUpdate: Double?
+    private var started = false            // first dot shown (after you start pointing)
+    private var pointingSince: Double?
     private var windows: [NSWindow] = []
     private var views: [TargetView] = []
     private let chime = NSSound(named: "Tink")
@@ -23,8 +26,11 @@ final class CalibrationController {
     /// Hold the fingertip within this distance (camera units) for `holdTime` to record a target.
     var holdRadius = 0.012
     var holdTime = 0.6
-    /// Give up on a target after this long (it is skipped).
-    var targetTimeout = 10.0
+    /// Give up on a target after this much time *with a hand in view* (it is skipped).
+    /// Time without a hand doesn't count: the calibration simply waits for you.
+    var targetTimeout = 12.0
+    /// Point for this long to begin.
+    var startHold = 0.5
 
     private(set) var isActive = false
 
@@ -71,24 +77,54 @@ final class CalibrationController {
 
     private func refresh() {
         for (i, v) in views.enumerated() {
+            v.progress = 0
+            guard started else {
+                v.target = nil
+                v.caption = "AirDial calibration: raise your index finger and point at this screen to begin"
+                v.needsDisplay = true
+                continue
+            }
             if index < targets.count, targets[index].screen == i {
                 v.target = CGPoint(x: targets[index].x, y: targets[index].y)
+                v.caption = "Point at the dot with your index finger and hold still (\(index + 1)/\(targets.count))"
             } else {
                 v.target = nil
+                if index < targets.count {
+                    let active = screens[targets[index].screen]
+                    let side = active.midX < screens[i].minX ? "← to the left" : (active.midX > screens[i].maxX ? "to the right →" : "on another display")
+                    v.caption = "Calibrating: the dot is on the display \(side)"
+                } else {
+                    v.caption = ""
+                }
             }
-            v.caption = index < targets.count
-                ? "Point at the dot with your index finger and hold still (\(index + 1)/\(targets.count))"
-                : ""
-            v.progress = 0
             v.needsDisplay = true
         }
     }
 
-    /// Feed every frame: the smoothed fingertip while pointing, or nil.
-    func update(tip: Vec2?, time t: Double) {
+    /// Feed every frame: the smoothed fingertip while pointing (or nil), and whether any hand is in view.
+    func update(tip: Vec2?, handVisible: Bool, time t: Double) {
         guard isActive, index < targets.count else { return }
-        if targetStart == nil { targetStart = t }
-        if let start = targetStart, t - start > targetTimeout {
+        let dt = lastUpdate.map { min(t - $0, 0.2) } ?? 0
+        lastUpdate = t
+
+        // Wait until you start pointing.
+        if !started {
+            if tip != nil {
+                let since = pointingSince ?? t
+                pointingSince = since
+                if t - since >= startHold {
+                    started = true
+                    print("[AirDial] Calibration started.")
+                    refresh()
+                }
+            } else {
+                pointingSince = nil
+            }
+            return
+        }
+
+        if handVisible { visibleTime += dt }
+        if visibleTime > targetTimeout {
             print("[AirDial] Calibration: skipped dot \(index + 1) (no steady pointing).")
             advance()
             return
@@ -113,7 +149,7 @@ final class CalibrationController {
     private func advance() {
         index += 1
         steady.removeAll()
-        targetStart = nil
+        visibleTime = 0
         if index >= targets.count { finish() } else { refresh() }
     }
 

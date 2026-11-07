@@ -24,8 +24,12 @@ final class CalibrationController {
     private let onDone: (PointerCalibration?) -> Void
 
     /// Hold the fingertip within this distance (camera units) for `holdTime` to record a target.
-    var holdRadius = 0.012
-    var holdTime = 0.6
+    /// The ring only starts once the finger has settled; any movement resets it.
+    var holdRadius = 0.008
+    var holdTime = 0.8
+    /// After a dot appears, this long is for moving your finger there; nothing is recorded.
+    var moveGrace = 1.0
+    private var dotShownAt: Double?
     /// Give up on a target after this much time *with a hand in view* (it is skipped).
     /// Time without a hand doesn't count: the calibration simply waits for you.
     var targetTimeout = 12.0
@@ -129,6 +133,9 @@ final class CalibrationController {
             advance()
             return
         }
+        // Time to move to the new dot first.
+        if dotShownAt == nil { dotShownAt = t }
+        if let shown = dotShownAt, t - shown < moveGrace { steady.removeAll(); return }
         guard let tip = tip else { steady.removeAll(); views.forEach { $0.progress = 0; $0.needsDisplay = true }; return }
         steady.append((t, tip))
         // Keep only the stretch where the fingertip stayed within holdRadius of the latest point.
@@ -150,6 +157,7 @@ final class CalibrationController {
         index += 1
         steady.removeAll()
         visibleTime = 0
+        dotShownAt = nil
         if index >= targets.count { finish() } else { refresh() }
     }
 

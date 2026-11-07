@@ -101,10 +101,11 @@ final class VoiceAgent {
 
         let p = Process()
         p.executableURL = URL(fileURLWithPath: python)
-        p.arguments = [script, "--command", command,
-                       "--displays", displays.map { "\(Int($0.minX)),\(Int($0.minY)),\(Int($0.width)),\(Int($0.height))" }
-                           .joined(separator: ";"),
-                       "--cursor", "\(Int(mouse.x)),\(Int(mouse.y))"]
+        // "--opt=value": values starting with "-" (displays / cursor left of the main display)
+        // would otherwise be read as options.
+        let displayArg = displays.map { "\(Int($0.minX)),\(Int($0.minY)),\(Int($0.width)),\(Int($0.height))" }
+            .joined(separator: ";")
+        p.arguments = [script, "--command=\(command)", "--displays=\(displayArg)", "--cursor=\(Int(mouse.x)),\(Int(mouse.y))"]
         var env = ProcessInfo.processInfo.environment
         env["ANTHROPIC_API_KEY"] = key
         p.environment = env

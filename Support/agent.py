@@ -79,8 +79,16 @@ class Display:
             subprocess.run(["screencapture", "-x", "-t", "png", "-R", f"{rx:.0f},{ry:.0f},{rw:.0f},{rh:.0f}", raw],
                            check=True, capture_output=True)
             if region:
-                # Full resolution, fitted into the usual screenshot size, aspect kept.
-                subprocess.run(["sips", "-Z", str(max(self.sw, self.sh)), raw, "--out", out], check=True, capture_output=True)
+                # Full resolution, fitted into the usual screenshot size (sw x sh), aspect kept, and
+                # within the model's image limits (2576 px long edge, 4784 visual tokens).
+                info = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", raw],
+                                      check=True, capture_output=True, text=True).stdout
+                pw = int(info.split("pixelWidth:")[1].split()[0]); ph = int(info.split("pixelHeight:")[1].split()[0])
+                f = min(1.0, self.sw / pw, self.sh / ph)
+                tw, th = max(1, int(pw * f)), max(1, int(ph * f))
+                while -(-tw // 28) * -(-th // 28) > 4784:
+                    tw, th = int(tw * 0.95), int(th * 0.95)
+                subprocess.run(["sips", "-z", str(th), str(tw), raw, "--out", out], check=True, capture_output=True)
             else:
                 subprocess.run(["sips", "-z", str(self.sh), str(self.sw), raw, "--out", out], check=True, capture_output=True)
             with open(out, "rb") as f:

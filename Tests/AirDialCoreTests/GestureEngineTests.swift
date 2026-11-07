@@ -42,6 +42,13 @@ private func hand(pose: HandPose, tipAt tip: Vec2, time: Double, spread: Double 
 
 private let fps = 30.0
 
+/// Circling for volume is off by default (one finger is the cursor); these tests turn it on.
+private func circleEngine() -> GestureEngine {
+    var c = GestureConfig()
+    c.enableCircleVolume = true
+    return GestureEngine(config: c)
+}
+
 private func run(_ engine: GestureEngine, pose: HandPose, seconds: Double, start: Double = 0, spread: Double = 1,
                  path: (Double) -> Vec2) -> [GestureAction] {
     var out: [GestureAction] = []
@@ -73,7 +80,7 @@ struct GestureEngineTests {
     }
 
     @Test func testClockwiseCircleTurnsVolumeUp() {
-        let e = GestureEngine()
+        let e = circleEngine()
         // Three loops, 1 s per loop, radius 0.1 (a comfortable circle about a fist wide): one step per loop.
         let actions = run(e, pose: .point, seconds: 3.2, path: circle(radius: 0.1, period: 1.0, clockwise: true))
         #expect(actions.count == 3, "\(actions)")
@@ -81,21 +88,21 @@ struct GestureEngineTests {
     }
 
     @Test func testCounterClockwiseCircleTurnsVolumeDown() {
-        let e = GestureEngine()
+        let e = circleEngine()
         let actions = run(e, pose: .point, seconds: 3.2, path: circle(radius: 0.1, period: 1.0, clockwise: false))
         #expect(actions.count == 3, "\(actions)")
         #expect(actions.allSatisfy { $0 == .volumeDown }, "\(actions)")
     }
 
     @Test func testSlowCircleStillWorks() {
-        let e = GestureEngine()
+        let e = circleEngine()
         let actions = run(e, pose: .point, seconds: 6.4, path: circle(radius: 0.12, period: 2.0, clockwise: true))
         #expect(actions.count == 3, "\(actions)")
         #expect(actions.allSatisfy { $0 == .volumeUp })
     }
 
     @Test func testReversingDirectionSwitchesVolumeDirection() {
-        let e = GestureEngine()
+        let e = circleEngine()
         var actions = run(e, pose: .point, seconds: 1.5, path: circle(radius: 0.1, period: 1.0, clockwise: true))
         actions += run(e, pose: .point, seconds: 1.5, start: 1.5,
                        path: circle(radius: 0.1, period: 1.0, clockwise: false, phase: .pi))
@@ -104,20 +111,20 @@ struct GestureEngineTests {
     }
 
     @Test func testPartialCircleDoesNothing() {
-        let e = GestureEngine()
+        let e = circleEngine()
         // Only ~200 degrees of arc: below the 270 degree start threshold.
         let actions = run(e, pose: .point, seconds: 0.55, path: circle(radius: 0.1, period: 1.0, clockwise: true))
         #expect(actions == [])
     }
 
     @Test func testTinyCircleDoesNothing() {
-        let e = GestureEngine()
+        let e = circleEngine()
         let actions = run(e, pose: .point, seconds: 2.0, path: circle(radius: 0.02, period: 0.7, clockwise: true))
         #expect(actions == [])
     }
 
     @Test func testBackAndForthLineDoesNothing() {
-        let e = GestureEngine()
+        let e = circleEngine()
         let actions = run(e, pose: .point, seconds: 3.0) { t in
             Vec2(0.5 + 0.15 * sin(2 * .pi * t / 0.8), 0.5 + 0.02 * sin(2 * .pi * t / 1.3))
         }
@@ -125,7 +132,7 @@ struct GestureEngineTests {
     }
 
     @Test func testJitterDoesNothing() {
-        let e = GestureEngine()
+        let e = circleEngine()
         var rng = SystemRandomNumberGenerator()
         let actions = run(e, pose: .point, seconds: 3.0) { _ in
             Vec2(0.6 + Double.random(in: -0.008...0.008, using: &rng), 0.5 + Double.random(in: -0.008...0.008, using: &rng))
@@ -134,7 +141,7 @@ struct GestureEngineTests {
     }
 
     @Test func testCircleWithOpenPalmDoesNothing() {
-        let e = GestureEngine()
+        let e = circleEngine()
         let actions = run(e, pose: .other, seconds: 2.0, path: circle(radius: 0.1, period: 1.0, clockwise: true))
         #expect(actions == [])
     }
@@ -221,6 +228,12 @@ struct GestureEngineTests {
         #expect(!acts.contains(.exitFullScreen) && !acts.contains(.enterFullScreen))
     }
 
+    @Test func testCirclingIsOffByDefault() {
+        let e = GestureEngine()
+        let actions = run(e, pose: .point, seconds: 3.2, path: circle(radius: 0.1, period: 1.0, clockwise: true))
+        #expect(actions == [])
+    }
+
     @Test func testNarrowHandPassingThroughDoesNotSwitchDesktop() {
         // An open hand seen edge-on / from afar (narrow palm) moving across the frame.
         let e = GestureEngine()
@@ -301,7 +314,7 @@ struct GestureEngineTests {
     }
 
     @Test func testBriefPoseDropoutDoesNotBreakCircle() {
-        let e = GestureEngine()
+        let e = circleEngine()
         var actions: [GestureAction] = []
         let path = circle(radius: 0.1, period: 1.0, clockwise: true)
         for i in 0..<96 {
@@ -317,7 +330,7 @@ struct GestureEngineTests {
     @Test func testFingerMisreadEveryLoopDoesNotBreakCircle() {
         // On a real webcam the finger is misread for several frames in a row once per loop,
         // when it turns towards the camera. That must not reset the circle.
-        let e = GestureEngine()
+        let e = circleEngine()
         var actions: [GestureAction] = []
         let path = circle(radius: 0.1, period: 1.0, clockwise: true)
         for i in 0..<96 {

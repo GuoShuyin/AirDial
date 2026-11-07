@@ -71,16 +71,32 @@ final class CursorController {
         lastPosted = target
     }
 
+    /// Audible feedback so you can tell a pinch was recognised.
+    var clickSound = NSSound(named: "Tink")
+
     func press() {
-        guard canPost(), Date() >= pausedUntil, let at = lastPosted ?? currentMouse else { return }
-        CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: at, mouseButton: .left)?.post(tap: .cghidEventTap)
+        guard canPost() else { print("[AirDial] Click ignored: dry run or no Accessibility permission."); return }
+        guard Date() >= pausedUntil else { print("[AirDial] Click ignored: you just used the real mouse."); return }
+        guard let at = lastPosted ?? currentMouse else { return }
+        postButton(.leftMouseDown, at: at)
         buttonDown = true
+        clickSound?.stop()
+        clickSound?.play()
+        print("[AirDial] Mouse down at (\(Int(at.x)), \(Int(at.y)))")
     }
 
     func release() {
         guard buttonDown else { return }
         buttonDown = false
         guard let at = lastPosted ?? currentMouse else { return }
-        CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: at, mouseButton: .left)?.post(tap: .cghidEventTap)
+        postButton(.leftMouseUp, at: at)
+        print("[AirDial] Mouse up at (\(Int(at.x)), \(Int(at.y)))")
+    }
+
+    private func postButton(_ type: CGEventType, at p: CGPoint) {
+        guard let e = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: type,
+                              mouseCursorPosition: p, mouseButton: .left) else { return }
+        e.setIntegerValueField(.mouseEventClickState, value: 1)  // a single click, as a real mouse reports it
+        e.post(tap: .cghidEventTap)
     }
 }

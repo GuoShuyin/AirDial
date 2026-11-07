@@ -19,6 +19,7 @@ public struct GestureStatus {
     public var palmArmed = false
     public var pointer: Vec2?          // normalized [0, 1]², y up; nil = not pointing
     public var pointerPressed = false
+    public var knobDegrees: Double = 0
 
     public init() {}
 }
@@ -39,8 +40,10 @@ public final class GestureEngine {
     private var swipe = SwipeDetector()
     private var palmSwipe = SwipeDetector()
     private var pointer: PointerTracker
+    private var knob = KnobTracker()
     private var handShape = HandShapeTransition()
     private var handShapeBlockedUntil: Double = -.infinity
+    private var knobBlockedUntil: Double = -.infinity
     private var lastFistSeen: Double = -.infinity
     private var pendingPalm: (action: GestureAction, time: Double)?
     private var palmFilter: OneEuroFilter2D
@@ -77,6 +80,7 @@ public final class GestureEngine {
            time >= handShapeBlockedUntil {
             actions.append(kind == .grab ? .exitFullScreen : .enterFullScreen)
             pendingPalm = nil
+            knobBlockedUntil = time + config.crossGestureLockout
             palmBlockedUntil = time + config.handShapeSwipeLockout
             circleBlockedUntil = time + config.crossGestureLockout
             swipeBlockedUntil = time + config.crossGestureLockout
@@ -99,7 +103,7 @@ public final class GestureEngine {
 
         switch activePose {
         case .point:
-            guard let s = sample, let tip = s.tip(.index) else { break }
+            guard config.enableCircleVolume, let s = sample, let tip = s.tip(.index) else { break }
             let p = filter.filter(tip, time: time)
             status.cursor = p
             let steps = circle.add(p, time: time, config: config)
@@ -118,6 +122,8 @@ public final class GestureEngine {
             if let dir = swipe.add(p, time: time, config: config), time >= swipeBlockedUntil {
                 if let action = action(for: dir) {
                     actions.append(action)
+                    knob.reset()
+                    knobBlockedUntil = time + config.crossGestureLockout
                     circleBlockedUntil = time + config.crossGestureLockout
                     palmBlockedUntil = time + config.crossGestureLockout
                 }
@@ -181,6 +187,17 @@ public final class GestureEngine {
             status.cursor = nil
         }
 
+        // Knob: thumb + index + middle held in place and turned.
+        if config.enableKnob {
+            let step = knob.add(sample, time: time, config: config)
+            if step != 0, time >= knobBlockedUntil {
+                actions.append(step > 0 ? .volumeUp : .volumeDown)
+                swipeBlockedUntil = time + config.crossGestureLockout
+                palmBlockedUntil = time + config.crossGestureLockout
+            }
+            status.knobDegrees = knob.progress
+        }
+
         // Act on a palm swipe once the hand stayed open for a moment; a fist cancels it.
         if let pending = pendingPalm {
             if lastFistSeen >= pending.time {
@@ -188,6 +205,7 @@ public final class GestureEngine {
             } else if time - pending.time >= config.palmSwipeConfirm {
                 actions.append(pending.action)
                 pendingPalm = nil
+                knobBlockedUntil = time + config.crossGestureLockout
                 handShapeBlockedUntil = time + config.crossGestureLockout
                 circleBlockedUntil = time + config.crossGestureLockout
                 swipeBlockedUntil = time + config.crossGestureLockout

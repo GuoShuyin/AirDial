@@ -18,7 +18,20 @@ public struct GestureConfig {
     /// whenever it turns towards the camera mid-circle, and that must not reset the circle.
     public var poseDropSeconds: Double = 0.5
 
+    // MARK: Knob (thumb + index + middle, turn the wrist) -> volume
+    public var enableKnob: Bool = true
+    /// Degrees of turning per volume step.
+    public var knobStepDegrees: Double = 35
+    /// The palm centre must have moved less than this (image heights) over the last 0.5 s.
+    public var knobMaxMove: Double = 0.05
+    /// Thumb tip to ring knuckle distance / knuckle width: the thumb is held out, not tucked.
+    public var knobThumbOut: Double = 0.6
+    /// A bigger turn between two frames is a keypoint glitch.
+    public var knobMaxTurnPerFrame: Double = 40
+
     // MARK: Circle (one finger) -> volume
+    /// Off by default: one finger is the mouse cursor, and circling it fought with pointing.
+    public var enableCircleVolume: Bool = false
     /// Total rotation needed before the first volume step fires.
     /// Large on purpose so random hand movement never triggers it.
     public var circleStartDegrees: Double = 270

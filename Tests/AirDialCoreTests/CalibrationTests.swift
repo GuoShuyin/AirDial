@@ -55,6 +55,29 @@ struct CalibrationTests {
         #expect(PointerCalibration.targets(screenCount: 3, order: [1, 0, 2]).count == 5)
     }
 
+    @Test func testTheCameraDisplayGetsCornersAndItsOwnMapping() {
+        // MacBook (index 1) has the camera: 5 dots there, centres elsewhere, main top/bottom.
+        let targets = PointerCalibration.targets(screenCount: 3, order: [1, 0, 2], detailed: 1)
+        #expect(targets.filter { $0.screen == 1 }.count == 5)
+        #expect(targets.count == 9)
+        // A tilted fingertip grid on the MacBook (perspective): x also shifts with height.
+        var samples: [PointerCalibration.Sample] = []
+        for t in targets {
+            let tip: Vec2
+            switch t.screen {
+            case 1: tip = Vec2(0.40 + 0.10 * t.x + 0.03 * t.y, 0.50 - 0.15 * t.y)
+            case 0: tip = Vec2(0.70, 0.55 + (0.5 - t.y) / 0.35 * 0.15)
+            default: tip = Vec2(0.94, 0.65)
+            }
+            samples.append(.init(screen: t.screen, targetX: t.x, targetY: t.y, tip: tip))
+        }
+        let c = PointerCalibration(samples: samples, screens: screens)
+        // Bottom-right corner of the MacBook: target (0.9, 0.9).
+        let p = c.point(for: Vec2(0.40 + 0.09 + 0.027, 0.50 - 0.135))!
+        #expect(abs(p.x - (-1512 + 0.9 * 1512)) < 10)
+        #expect(abs(p.y - (681 + 0.9 * 982)) < 10)
+    }
+
     @Test func testCalibrationRoundTripsThroughJSON() throws {
         let c = fakeCalibration()
         let d = try JSONDecoder().decode(PointerCalibration.self, from: JSONEncoder().encode(c))

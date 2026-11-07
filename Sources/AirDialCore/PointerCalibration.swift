@@ -39,13 +39,56 @@ public struct PointerCalibration: Codable, Equatable {
 
     /// The targets to show: the centre of every display, plus the top and bottom centre of the
     /// main display (index 0) for the vertical scale. Fractions of the display, x right, y down.
-    public static func targets(screenCount: Int, order: [Int]) -> [(screen: Int, x: Double, y: Double)] {
-        var t = order.map { (screen: $0, x: 0.5, y: 0.5) }
-        if screenCount > 0 {
+    /// `detailed` (the display with the camera, where pointing is hardest) also gets its four
+    /// corners, and then has its own full 2D mapping.
+    public static func targets(screenCount: Int, order: [Int], detailed: Int? = nil) -> [(screen: Int, x: Double, y: Double)] {
+        var t: [(screen: Int, x: Double, y: Double)] = []
+        for s in order {
+            if s == detailed {
+                t += [(s, 0.5, 0.5), (s, 0.1, 0.1), (s, 0.9, 0.1), (s, 0.9, 0.9), (s, 0.1, 0.9)]
+            } else {
+                t.append((s, 0.5, 0.5))
+            }
+        }
+        if screenCount > 0, detailed != 0 {
             t.append((screen: 0, x: 0.5, y: 0.15))
             t.append((screen: 0, x: 0.5, y: 0.85))
         }
         return t
+    }
+
+    /// Least-squares affine map fingertip -> global point from a display's own samples, if it has
+    /// at least 4 spread out (corners): handles the perspective tilt of pointing at that display.
+    private func affine(for screen: Int) -> ((Vec2) -> CGPoint)? {
+        let own = samples.filter { $0.screen == screen }
+        guard own.count >= 4, Set(own.map { $0.targetX }).count >= 2, Set(own.map { $0.targetY }).count >= 2 else { return nil }
+        let r = screens[screen]
+        // Normal equations for [gx gy] = [tx ty 1] * M.
+        var ata = [[Double]](repeating: [0, 0, 0], count: 3)
+        var atx = [0.0, 0, 0], aty = [0.0, 0, 0]
+        for s in own {
+            let row = [s.tipX, s.tipY, 1]
+            let gx = Double(r.minX) + s.targetX * Double(r.width), gy = Double(r.minY) + s.targetY * Double(r.height)
+            for i in 0..<3 {
+                for j in 0..<3 { ata[i][j] += row[i] * row[j] }
+                atx[i] += row[i] * gx
+                aty[i] += row[i] * gy
+            }
+        }
+        func solve(_ a: [[Double]], _ b: [Double]) -> [Double]? {
+            var m = a.enumerated().map { $0.element + [b[$0.offset]] }
+            for col in 0..<3 {
+                guard let p = (col..<3).max(by: { abs(m[$0][col]) < abs(m[$1][col]) }), abs(m[p][col]) > 1e-12 else { return nil }
+                m.swapAt(col, p)
+                for r in 0..<3 where r != col {
+                    let f = m[r][col] / m[col][col]
+                    for k in col..<4 { m[r][k] -= f * m[col][k] }
+                }
+            }
+            return (0..<3).map { m[$0][3] / m[$0][$0] }
+        }
+        guard let mx = solve(ata, atx), let my = solve(ata, aty) else { return nil }
+        return { tip in CGPoint(x: mx[0] * tip.x + mx[1] * tip.y + mx[2], y: my[0] * tip.x + my[1] * tip.y + my[2]) }
     }
 
     /// Usable when it was made for the same display layout and covers every display.
@@ -60,9 +103,21 @@ public struct PointerCalibration: Codable, Equatable {
     public func point(for tip: Vec2) -> CGPoint? {
         guard !samples.isEmpty, !screens.isEmpty else { return nil }
 
-        // Horizontal: piecewise linear through the samples, sorted by fingertip x. Samples that
-        // would make the curve run backwards (pointing errors) are dropped.
-        var xs = samples.map { (tip: $0.tipX, g: globalX($0)) }.sorted { $0.tip < $1.tip }
+        // A display with its own full (corner) calibration claims the points that map onto it.
+        for i in screens.indices {
+            guard let map = affine(for: i) else { continue }
+            let p = map(tip), r = screens[i]
+            let mx = r.width * 0.02, my = r.height * 0.02
+            if p.x >= r.minX - mx, p.x < r.maxX + mx, p.y >= r.minY - my, p.y < r.maxY + my {
+                return CGPoint(x: min(max(p.x, r.minX), r.maxX - 1), y: min(max(p.y, r.minY), r.maxY - 1))
+            }
+        }
+
+        // Horizontal: piecewise linear through the display centres (horizontally centred
+        // samples), sorted by fingertip x. Samples that would make the curve run backwards
+        // (pointing errors) are dropped.
+        let centred = samples.filter { $0.targetX == 0.5 }
+        var xs = (centred.isEmpty ? samples : centred).map { (tip: $0.tipX, g: globalX($0)) }.sorted { $0.tip < $1.tip }
         var mono: [(tip: Double, g: Double)] = []
         for p in xs where mono.last.map({ p.g > $0.g && p.tip > $0.tip + 1e-4 }) ?? true { mono.append(p) }
         xs = mono
@@ -83,6 +138,10 @@ public struct PointerCalibration: Codable, Equatable {
         let index = screens.indices.first { x >= Double(screens[$0].minX) && x < Double(screens[$0].maxX) }
             ?? screens.indices.min { abs(Double(screens[$0].midX) - x) < abs(Double(screens[$1].midX) - x) }!
         let screen = screens[index]
+        if let map = affine(for: index) {
+            let p = map(tip)
+            return CGPoint(x: min(max(p.x, screen.minX), screen.maxX - 1), y: min(max(p.y, screen.minY), screen.maxY - 1))
+        }
 
         // Vertical, in pixels: one scale (pixels per unit of fingertip height) from the display(s)
         // calibrated at several heights, and each display's own samples to line it up.

@@ -175,7 +175,8 @@ public struct GestureConfig {
     /// (with 0.6 people kept the "button" held for seconds, turning clicks into drags).
     public var pinchOpenRatio: Double = 0.35
     /// 3D (MediaPipe): thumb tip to pinch fingertip distance in metres: below = pinched, above = open.
-    public var pinchClose3D: Double = 0.025
+    /// (Also the "touching the middle finger" distance for taps and scrolling.)
+    public var pinchClose3D: Double = 0.02
     public var pinchOpen3D: Double = 0.035
     /// 3D: frames in a row the thumb must touch (3D is steady enough for a short tap).
     public var pinchFrames3D: Int = 2
@@ -184,6 +185,13 @@ public struct GestureConfig {
     /// finger while pointing (very common) never clicks; lifting it a little and tapping does.
     public var tapWindow: Double = 0.6
     public var tapLift: Double = 0.015
+    /// 3D: after the thumb taps down, wait this long (or until it lifts) before clicking; if it
+    /// slides more than `tapSlideCancel3D` along the finger meanwhile, it's scrolling instead.
+    public var tapConfirm: Double = 0.2
+    public var tapSlideCancel3D: Double = 0.004
+    /// 3D left click target: the middle finger's first knuckle by the fingertip (DIP), or with
+    /// this set, the fingertip itself. The right click is always the second knuckle (PIP).
+    public var leftClickAtFingertip: Bool = false
     /// 3D: thumb sliding along the middle finger = scroll wheel. Contact = thumb tip within this
     /// distance of the finger; it must slide `scrollDeadZone3D` before scrolling starts.
     public var enableScroll: Bool = true

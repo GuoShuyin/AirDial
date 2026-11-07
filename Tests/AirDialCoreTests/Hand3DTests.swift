@@ -29,8 +29,8 @@ private func hand3D(thumb: Vec3, time: Double, indexTip2D: Vec2 = Vec2(0.7, 0.5)
 }
 
 struct Hand3DTests {
-    let middleTip = Vec3(-0.005, 0.005, -0.035)
-    let middlePIP = Vec3(-0.005, 0.03, -0.01)
+    let middleDIP = Vec3(-0.005, 0.025, -0.035)   // first knuckle, by the fingertip: left click
+    let middlePIP = Vec3(-0.005, 0.03, -0.01)     // second knuckle: right click
     let away = Vec3(-0.08, -0.02, -0.02)
 
     @Test func testBendDecidesFingerState() {
@@ -54,8 +54,8 @@ struct Hand3DTests {
         return out
     }
 
-    @Test func testTappingTheMiddleFingertipIsALeftClick() {
-        #expect(run([(away, 10), (middleTip + Vec3(0.005, 0, 0), 8), (away, 5)]) == [.press, .release])
+    @Test func testTappingTheFirstKnuckleIsALeftClick() {
+        #expect(run([(away, 10), (middleDIP + Vec3(0.006, 0, 0), 8), (away, 5)]) == [.press])
     }
 
     @Test func testTappingTheSecondKnuckleIsARightClick() {
@@ -65,13 +65,14 @@ struct Hand3DTests {
     @Test func testAThumbRestingOnTheFingerDoesNotClick() {
         // Already touching when the hand appears, and never lifted: no tap.
         #expect(run([(middlePIP + Vec3(0, 0.008, 0), 40)]) == [])
-        #expect(run([(middleTip + Vec3(0.005, 0, 0), 40)]) == [])
+        #expect(run([(middleDIP + Vec3(0.006, 0, 0), 40)]) == [])
     }
 
     @Test func testLiftingARestingThumbAndTappingIsARightClick() {
         // Resting on the knuckle, lift ~2 cm, tap down again.
         let rest = middlePIP + Vec3(0, 0.008, 0)
-        #expect(run([(rest, 30), (rest + Vec3(0, 0.02, 0.01), 4), (rest, 6)]) == [.rightClick])
+        // (The click is confirmed 0.2 s after touching down, once it's clear the thumb isn't sliding.)
+        #expect(run([(rest, 30), (rest + Vec3(0, 0.02, 0.01), 4), (rest, 10)]) == [.rightClick])
     }
 
     private func scrollTotal(_ thumbs: [(Vec3, Int)]) -> (Double, [PointerTracker.Event]) {
@@ -103,6 +104,18 @@ struct Hand3DTests {
         let (down, events2) = scrollTotal(back + [(a, 4)])
         #expect(down < -100)
         #expect(events2.isEmpty)
+    }
+
+    @Test func testTapThenSlideIsAScrollNotAClick() {
+        // Tap down on the second knuckle, then slide towards the fingertip right away.
+        let a = middlePIP + Vec3(0, 0.006, 0)
+        let b = Vec3(-0.005, 0.022, -0.032)
+        var seq: [(Vec3, Int)] = [(away, 10), (a, 1)]
+        for k in 1...10 { seq.append((a + (b - a) * (Double(k) / 10), 1)) }
+        seq.append((b, 3))
+        let (total, events) = scrollTotal(seq)
+        #expect(events.isEmpty)
+        #expect(total > 50)
     }
 
     @Test func testSlowlySlidingOntoTheKnuckleIsNotATap() {

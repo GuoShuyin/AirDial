@@ -66,7 +66,11 @@ final class CalibrationController {
         self.onDone = onDone
         // Left to right, so the sequence follows the display arrangement.
         let order = screens.indices.sorted { screens[$0].minX < screens[$1].minX }
-        for t in PointerCalibration.targets(screenCount: screens.count, order: order) {
+        // The display with the camera (built in) gets corners too: pointing at it means pointing at the camera.
+        let builtIn = nsScreens.firstIndex { s in
+            (s.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? UInt32).map { CGDisplayIsBuiltin($0) != 0 } ?? false
+        }
+        for t in PointerCalibration.targets(screenCount: screens.count, order: order, detailed: builtIn) {
             targets.append(Target(screen: t.screen, x: t.x, y: t.y))
         }
     }

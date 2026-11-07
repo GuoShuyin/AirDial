@@ -30,6 +30,12 @@ final class CalibrationController {
     /// After a dot appears, this long is for moving your finger there; nothing is recorded.
     var moveGrace = 1.0
     private var dotShownAt: Double?
+    /// The finger must first move this far (camera units) after a dot appears: otherwise a finger
+    /// still resting from the previous step gets recorded before you even saw the new dot.
+    var mustMove = 0.04
+    private var anchor: Vec2?
+    private var moved = false
+    private let newDotSound = NSSound(named: "Pop")
     /// Give up on a target after this much time *with a hand in view* (it is skipped).
     /// Time without a hand doesn't count: the calibration simply waits for you.
     var targetTimeout = 12.0
@@ -95,6 +101,7 @@ final class CalibrationController {
                 v.needsDisplay = true
                 continue
             }
+            v.active = index < targets.count && targets[index].screen == i
             if index < targets.count, targets[index].screen == i {
                 v.target = CGPoint(x: targets[index].x, y: targets[index].y)
                 v.caption = "Point at the dot with your index finger and hold still (\(index + 1)/\(targets.count))"
@@ -127,6 +134,7 @@ final class CalibrationController {
                     started = true
                     print("[AirDial] Calibration started.")
                     refresh()
+                    newDotSound?.play()
                 } else {
                     let text = "Index finger found. Starting in \(Int(left.rounded(.up)))…"
                     for v in views where v.caption != text { v.caption = text; v.needsDisplay = true }
@@ -152,8 +160,16 @@ final class CalibrationController {
         }
         // Time to move to the new dot first.
         if dotShownAt == nil { dotShownAt = t }
-        if let shown = dotShownAt, t - shown < moveGrace { steady.removeAll(); return }
+        if let shown = dotShownAt, t - shown < moveGrace {
+            steady.removeAll()
+            if anchor == nil, let tip = tip { anchor = tip }
+            return
+        }
         guard let tip = tip else { steady.removeAll(); views.forEach { $0.progress = 0; $0.needsDisplay = true }; return }
+        if !moved {
+            if anchor == nil { anchor = tip }
+            if let a = anchor, tip.distance(to: a) >= mustMove { moved = true } else { return }
+        }
         steady.append((t, tip))
         // Keep only the stretch where the fingertip stayed within holdRadius of the latest point.
         while let first = steady.first, first.p.distance(to: tip) > holdRadius { steady.removeFirst() }
@@ -175,7 +191,9 @@ final class CalibrationController {
         steady.removeAll()
         visibleTime = 0
         dotShownAt = nil
-        if index >= targets.count { finish() } else { refresh() }
+        anchor = nil
+        moved = false
+        if index >= targets.count { finish() } else { refresh(); newDotSound?.stop(); newDotSound?.play() }
     }
 
     private func finish() {
@@ -205,30 +223,45 @@ private final class TargetView: NSView {
     var target: CGPoint?        // fractions, x right, y down
     var caption = ""
     var progress = 0.0
+    var active = false
 
     override func draw(_ dirtyRect: NSRect) {
         NSColor.black.withAlphaComponent(target == nil ? 0.15 : 0.35).setFill()
         bounds.fill()
-        guard let t = target else { return }
+        if active {
+            // A bright frame around the display that has the dot.
+            let frame = NSBezierPath(rect: bounds.insetBy(dx: 6, dy: 6))
+            frame.lineWidth = 12
+            NSColor.systemYellow.setStroke()
+            frame.stroke()
+        }
+        guard let t = target else {
+            drawCaption(at: NSPoint(x: bounds.midX, y: bounds.midY))
+            return
+        }
         let c = NSPoint(x: bounds.width * t.x, y: bounds.height * (1 - t.y))
-        let ring = NSBezierPath(ovalIn: NSRect(x: c.x - 40, y: c.y - 40, width: 80, height: 80))
-        ring.lineWidth = 4
+        let r: CGFloat = 60
+        let ring = NSBezierPath(ovalIn: NSRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+        ring.lineWidth = 6
         NSColor.white.setStroke()
         ring.stroke()
         if progress > 0 {
             let arc = NSBezierPath()
-            arc.appendArc(withCenter: c, radius: 40, startAngle: 90, endAngle: 90 - 360 * progress, clockwise: true)
-            arc.lineWidth = 8
+            arc.appendArc(withCenter: c, radius: r, startAngle: 90, endAngle: 90 - 360 * progress, clockwise: true)
+            arc.lineWidth = 12
             NSColor.systemGreen.setStroke()
             arc.stroke()
         }
         NSColor.systemRed.setFill()
-        NSBezierPath(ovalIn: NSRect(x: c.x - 10, y: c.y - 10, width: 20, height: 20)).fill()
+        NSBezierPath(ovalIn: NSRect(x: c.x - 16, y: c.y - 16, width: 32, height: 32)).fill()
 
-        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 22, weight: .semibold), .foregroundColor: NSColor.white]
+        drawCaption(at: NSPoint(x: c.x, y: t.y < 0.5 ? c.y - 110 : c.y + 110))
+    }
+
+    private func drawCaption(at p: NSPoint) {
+        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 26, weight: .semibold), .foregroundColor: NSColor.white]
         let s = NSAttributedString(string: caption, attributes: attrs)
         let size = s.size()
-        let y = t.y < 0.5 ? c.y - 90 - size.height : c.y + 70
-        s.draw(at: NSPoint(x: min(max(c.x - size.width / 2, 20), bounds.width - size.width - 20), y: y))
+        s.draw(at: NSPoint(x: min(max(p.x - size.width / 2, 20), bounds.width - size.width - 20), y: p.y - size.height / 2))
     }
 }

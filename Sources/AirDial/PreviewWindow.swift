@@ -46,14 +46,14 @@ final class OverlayView: NSView {
         let poseText: String
         switch status.pose {
         case .point: poseText = "☝️ One finger: point = cursor, thumb+middle pinch = click"
-        case .twoFingers: poseText = "✌️ Two fingers: swipe for tracks"
+        case .twoFingers: poseText = status.fingersTogether ? "🤞 Two fingers together: circle for volume" : "✌️ V: swipe for next track"
         case .openPalm: poseText = "🖐 Open palm: swipe (sideways: desktops, up/down: Mission Control)"
         case .fist: poseText = "✊ Fist (open it: full screen)"
         case .other: poseText = "Not a gesture"
         case .none: poseText = "No hand detected"
         }
         var lines = [poseText]
-        if status.pose == .point {
+        if status.pose == .point || (status.pose == .twoFingers && status.fingersTogether) {
             lines.append(String(format: "Rotation %.0f°%@", status.circleDegrees, status.circleEngaged ? "  (engaged)" : ""))
         }
         if status.pose == .openPalm {

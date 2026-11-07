@@ -20,6 +20,12 @@ private func knobHand(angle: Double, offset: Vec2 = .zero, time: Double, thumbCo
                       thumbTip: rot(Vec2(-0.17, 0.02)), thumbConfidence: thumbConfidence)
 }
 
+private func knobEngine() -> GestureEngine {
+    var c = GestureConfig()
+    c.enableKnob = true
+    return GestureEngine(config: c)
+}
+
 struct KnobTests {
     private func turn(_ e: GestureEngine, from a0: Double, to a1: Double, seconds: Double, start: Double = 0,
                       offset: (Double) -> Vec2 = { _ in .zero }) -> [GestureAction] {
@@ -39,18 +45,18 @@ struct KnobTests {
 
     @Test func testTurningRightTurnsVolumeUp() {
         // Clockwise as you see it = negative angle (y up). 80 degrees = 2 steps of 35.
-        let acts = turn(GestureEngine(), from: 0, to: -80, seconds: 0.8)
+        let acts = turn(knobEngine(), from: 0, to: -80, seconds: 0.8)
         #expect(acts == [.volumeUp, .volumeUp])
     }
 
     @Test func testTurningLeftTurnsVolumeDown() {
-        let acts = turn(GestureEngine(), from: 0, to: 80, seconds: 0.8)
+        let acts = turn(knobEngine(), from: 0, to: 80, seconds: 0.8)
         #expect(acts == [.volumeDown, .volumeDown])
     }
 
     @Test func testSwipingWithTheGripIsNotATurn() {
         // The hand moves 0.3 sideways while the wrist happens to rotate 60 degrees.
-        let acts = turn(GestureEngine(), from: 0, to: -60, seconds: 0.5, offset: { f in Vec2(0.3 * f, 0) })
+        let acts = turn(knobEngine(), from: 0, to: -60, seconds: 0.5, offset: { f in Vec2(0.3 * f, 0) })
         #expect(!acts.contains(.volumeUp) && !acts.contains(.volumeDown))
     }
 

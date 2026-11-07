@@ -23,7 +23,8 @@ public struct GestureConfig {
     public var poseDropSeconds: Double = 0.5
 
     // MARK: Knob (thumb + index + middle, turn the wrist) -> volume
-    public var enableKnob: Bool = true
+    /// Off by default: turning the wrist was hard to do and to see reliably.
+    public var enableKnob: Bool = false
     /// Degrees of turning per volume step.
     public var knobStepDegrees: Double = 35
     /// The palm centre must have moved less than this (image heights) over the last 0.5 s.
@@ -38,6 +39,16 @@ public struct GestureConfig {
     public var knobGripMax3D: Double = 0.11
     /// Flip the 3D turning direction (if turning right lowers the volume on your setup).
     public var knobReverse3D: Bool = false
+
+    // MARK: Two fingers held together, draw a circle -> volume
+    /// Index and middle finger side by side (not a V): circling them clockwise = volume up.
+    public var enableTwoFingerCircle: Bool = true
+    /// Fingertip spread: together below the first value, apart (a V, for swipes) above the
+    /// second. 3D in metres; 2D relative to the knuckle width.
+    public var fingersTogether3D: Double = 0.025
+    public var fingersApart3D: Double = 0.035
+    public var fingersTogether2D: Double = 0.35
+    public var fingersApart2D: Double = 0.5
 
     // MARK: Circle (one finger) -> volume
     /// Off by default: one finger is the mouse cursor, and circling it fought with pointing.
@@ -84,7 +95,8 @@ public struct GestureConfig {
     /// "bring your hand back" motion from undoing the swipe).
     public var swipeReturnLockout: Double = 1.4
     public var enableVerticalSwipe: Bool = true
-    public var enableHorizontalSwipe: Bool = true
+    /// Off by default: sideways two-finger moves do nothing (sideways belongs to the palm / desktops).
+    public var enableHorizontalSwipe: Bool = false
     /// true: two fingers up OR down = next track. Up and down are hard to tell apart on a webcam
     /// (a swipe often starts with a quick wind-up the other way), so by default both mean "next".
     public var verticalSwipeAlwaysNext: Bool = true

@@ -21,10 +21,10 @@ struct Options {
     static let usage = """
     AirDial — mid-air gestures for music on macOS (uses the built-in webcam)
 
-      🤏 Thumb + index + middle, turn   like a knob: right = volume up, left = volume down
+      🤞 Index + middle together, circle   clockwise = volume up, counter-clockwise = volume down
       🖐→✊ Close your open hand          front window exits full screen;  ✊→🖐 open it: full screen
       ☝️  Index finger, point           moves the mouse cursor (all displays); pinch thumb + middle finger = click
-      ✌️  Two fingers (V), swipe        up or down = next track (right / left = next / previous)
+      ✌️  Two fingers apart (V), swipe   up or down = next track
       🖐  Open palm facing the camera, swipe   sideways = switch desktop, up or down = Mission Control on/off
 
     Usage: AirDial [options]
@@ -41,13 +41,13 @@ struct Options {
       --ccw-up            Counter-clockwise = volume up (reverse the knob)
       --vertical-prev     Two fingers up = next, down = previous (default: both = next)
       --swipe-down-next   With --vertical-prev: down = next, up = previous
-      --no-horizontal     Disable left/right swipes
+      --horizontal-tracks Two fingers right / left = next / previous track (off by default)
       --no-vertical       Disable up/down swipes
       --no-desktops       Disable open-palm swipes (desktops and Mission Control)
       --no-mission-control  Disable open-palm up/down = Mission Control
       --no-hand-shapes    Disable fist = exit full screen, open hand = full screen
       --circle-volume     Also change volume by circling the index finger (off: it fights the cursor)
-      --no-knob           Disable the three-finger knob
+      --knob              Also use the three-finger knob for volume (turn right = up)
       --pinch-index       Click by pinching thumb + index (default: thumb + middle finger)
       --no-cursor         Don't move the mouse cursor with the index finger
       --palm-hold         Strict: hold the open palm still for a moment before it can swipe
@@ -85,7 +85,7 @@ struct Options {
             case "--ccw-up": o.config.clockwiseIsVolumeUp = false
             case "--vertical-prev": o.config.verticalSwipeAlwaysNext = false
             case "--swipe-down-next": o.config.swipeUpIsNext = false
-            case "--no-horizontal": o.config.enableHorizontalSwipe = false
+            case "--horizontal-tracks": o.config.enableHorizontalSwipe = true
             case "--no-vertical": o.config.enableVerticalSwipe = false
             case "--no-desktops": o.config.enablePalmSwipe = false
             case "--no-mission-control": o.config.enablePalmVerticalSwipe = false
@@ -94,7 +94,7 @@ struct Options {
             case "--no-cursor": o.config.enablePointer = false
             case "--pinch-index": o.config.pinchFinger = .index
             case "--circle-volume": o.config.enableCircleVolume = true
-            case "--no-knob": o.config.enableKnob = false
+            case "--knob": o.config.enableKnob = true
             case "--no-hand-shapes": o.config.enableHandShapes = false
             case "--sensitivity":
                 i += 1
@@ -246,7 +246,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 print("[AirDial] Cursor: using the saved calibration.")
             }
         }
-        print("[AirDial] Running. ☝️ point = cursor, 🤏 turn = volume, ✌️ swipe = next track, 🖐 swipe = desktops." + (options.headless ? " Ctrl+C to quit." : ""))
+        print("[AirDial] Running. ☝️ point = cursor, 🤞 circle = volume, ✌️ swipe = next track, 🖐 swipe = desktops." + (options.headless ? " Ctrl+C to quit." : ""))
     }
 
     private func handle(_ sample: HandSample?, time: Double, aspect: Double, info: FrameInfo) {

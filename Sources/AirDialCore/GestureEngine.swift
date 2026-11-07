@@ -21,6 +21,7 @@ public struct GestureStatus {
     public var pointerTip: Vec2?       // smoothed fingertip, camera coordinates (for calibration)
     public var pointerPressed = false
     public var knobDegrees: Double = 0
+    public var fingersTogether = false
 
     public init() {}
 }
@@ -42,6 +43,7 @@ public final class GestureEngine {
     private var palmSwipe = SwipeDetector()
     private var pointer: PointerTracker
     private var knob = KnobTracker()
+    private var fingersTogether = false
     private var handShape = HandShapeTransition()
     private var handShapeBlockedUntil: Double = -.infinity
     private var knobBlockedUntil: Double = -.infinity
@@ -121,6 +123,26 @@ public final class GestureEngine {
             guard let s = sample, let a = s.tip(.index), let b = s.tip(.middle) else { break }
             let p = filter.filter(Vec2.midpoint(a, b), time: time)
             status.cursor = p
+
+            // Together (side by side) = circle for volume; apart (a V) = swipe for tracks.
+            if config.enableTwoFingerCircle, let spread = fingerSpread(s) {
+                let wasTogether = fingersTogether
+                if spread.d < spread.together { fingersTogether = true } else if spread.d > spread.apart { fingersTogether = false }
+                if wasTogether != fingersTogether { circle.reset(); swipe.resetMotion() }
+            }
+            status.fingersTogether = fingersTogether
+            if fingersTogether && config.enableTwoFingerCircle {
+                let steps = circle.add(p, time: time, config: config)
+                if steps != 0, time >= circleBlockedUntil {
+                    let clockwise = steps < 0
+                    actions.append(clockwise == config.clockwiseIsVolumeUp ? .volumeUp : .volumeDown)
+                    swipeBlockedUntil = time + config.crossGestureLockout
+                    palmBlockedUntil = time + config.crossGestureLockout
+                }
+                status.circleDegrees = circle.displayDegrees
+                status.circleEngaged = circle.engaged
+                break
+            }
             if let dir = swipe.add(p, time: time, config: config), time >= swipeBlockedUntil {
                 if let action = action(for: dir) {
                     actions.append(action)
@@ -217,6 +239,15 @@ public final class GestureEngine {
         status.circleDegrees = circle.displayDegrees
         status.circleEngaged = circle.engaged
         return actions
+    }
+
+    /// Index-middle fingertip spread with the together / apart thresholds for it.
+    private func fingerSpread(_ s: HandSample) -> (d: Double, together: Double, apart: Double)? {
+        if let a = s.worldTip(.index), let b = s.worldTip(.middle) {
+            return (a.distance(to: b), config.fingersTogether3D, config.fingersApart3D)
+        }
+        guard let a = s.tip(.index), let b = s.tip(.middle), let w = s.palmWidth, w > 1e-3 else { return nil }
+        return (a.distance(to: b) / w, config.fingersTogether2D, config.fingersApart2D)
     }
 
     private func action(for dir: SwipeDirection) -> GestureAction? {

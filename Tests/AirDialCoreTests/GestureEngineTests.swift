@@ -5,7 +5,7 @@ import Testing
 /// Synthetic hands: the whole hand is translated so that the tracked fingertip follows a path.
 /// `spread` scales the sideways spacing of the fingers: 1 = a narrow hand (palm width 0.09,
 /// like an edge-on hand), 1.7 = a palm facing the camera from up close (width ~0.15, measured).
-private func hand(pose: HandPose, tipAt tip: Vec2, time: Double, spread: Double = 1) -> HandSample {
+private func hand(pose: HandPose, tipAt tip: Vec2, time: Double, spread: Double = 1, together: Bool = false) -> HandSample {
     // Hand layout relative to the wrist (units of image height).
     let extendedTip = Vec2(0, 0.25), extendedPip = Vec2(0, 0.15)
     let curledTip = Vec2(0, 0.08), curledPip = Vec2(0, 0.12)
@@ -24,7 +24,9 @@ private func hand(pose: HandPose, tipAt tip: Vec2, time: Double, spread: Double 
     case .fist: ext = [.index: false, .middle: false, .ring: false, .little: false]
     default: ext = [.index: true, .middle: true, .ring: true, .little: true]
     }
-    let dxs: [Finger: Double] = [.index: -0.03, .middle: 0.0, .ring: 0.03, .little: 0.06]
+    // Two fingers: a V (index spread away from the middle finger) unless `together`.
+    var dxs: [Finger: Double] = [.index: -0.03, .middle: 0.0, .ring: 0.03, .little: 0.06]
+    if pose == .twoFingers { dxs[.index] = together ? -0.015 : -0.07 }
 
     var fingers: [Finger: HandSample.FingerJoints] = [:]
     for f in Finger.allCases { fingers[f] = joints(ext[f]!, dx: dxs[f]! * spread) }
@@ -50,12 +52,12 @@ private func circleEngine() -> GestureEngine {
 }
 
 private func run(_ engine: GestureEngine, pose: HandPose, seconds: Double, start: Double = 0, spread: Double = 1,
-                 path: (Double) -> Vec2) -> [GestureAction] {
+                 together: Bool = false, path: (Double) -> Vec2) -> [GestureAction] {
     var out: [GestureAction] = []
     let n = Int(seconds * fps)
     for i in 0..<n {
         let t = start + Double(i) / fps
-        let s = hand(pose: pose, tipAt: path(t - start), time: t, spread: spread)
+        let s = hand(pose: pose, tipAt: path(t - start), time: t, spread: spread, together: together)
         out += engine.process(s, time: t)
     }
     return out
@@ -228,6 +230,34 @@ struct GestureEngineTests {
         #expect(!acts.contains(.exitFullScreen) && !acts.contains(.enterFullScreen))
     }
 
+    @Test func testTwoFingersTogetherCircleClockwiseTurnsVolumeUp() {
+        let e = GestureEngine()
+        let actions = run(e, pose: .twoFingers, seconds: 3.2, together: true,
+                          path: circle(radius: 0.1, period: 1.0, clockwise: true))
+        #expect(actions == [.volumeUp, .volumeUp, .volumeUp])
+    }
+
+    @Test func testTwoFingersTogetherCircleCounterClockwiseTurnsVolumeDown() {
+        let e = GestureEngine()
+        let actions = run(e, pose: .twoFingers, seconds: 3.2, together: true,
+                          path: circle(radius: 0.1, period: 1.0, clockwise: false))
+        #expect(actions == [.volumeDown, .volumeDown, .volumeDown])
+    }
+
+    @Test func testCirclingWithAVIsNotVolume() {
+        let e = GestureEngine()
+        let actions = run(e, pose: .twoFingers, seconds: 3.2, path: circle(radius: 0.1, period: 1.0, clockwise: true))
+        #expect(!actions.contains(.volumeUp) && !actions.contains(.volumeDown))
+    }
+
+    @Test func testSwipingWithFingersTogetherIsNotATrackChange() {
+        let e = GestureEngine()
+        let actions = run(e, pose: .twoFingers, seconds: 1.0, together: true) { t in
+            Vec2(0.66, t < 0.3 ? 0.65 : max(0.35, 0.65 - (t - 0.3) / 0.25 * 0.3))
+        }
+        #expect(actions == [])
+    }
+
     @Test func testCirclingIsOffByDefault() {
         let e = GestureEngine()
         let actions = run(e, pose: .point, seconds: 3.2, path: circle(radius: 0.1, period: 1.0, clockwise: true))
@@ -292,14 +322,24 @@ struct GestureEngineTests {
         #expect(actions == [.previousTrack])
     }
 
-    @Test func testTwoFingerSwipeRightAndLeft() {
+    @Test func testTwoFingerSwipeSidewaysDoesNothingByDefault() {
         let e = GestureEngine()
+        let right = run(e, pose: .twoFingers, seconds: 1.0) { t in
+            Vec2(t < 0.3 ? 0.4 : min(0.8, 0.4 + (t - 0.3) / 0.25 * 0.4), 0.5)
+        }
+        #expect(right == [])
+    }
+
+    @Test func testTwoFingerSwipeRightAndLeftWithHorizontalTracks() {
+        var c = GestureConfig()
+        c.enableHorizontalSwipe = true
+        let e = GestureEngine(config: c)
         let right = run(e, pose: .twoFingers, seconds: 1.0) { t in
             Vec2(t < 0.3 ? 0.4 : min(0.8, 0.4 + (t - 0.3) / 0.25 * 0.4), 0.5)
         }
         #expect(right == [.nextTrack])
 
-        let e2 = GestureEngine()
+        let e2 = GestureEngine(config: c)
         let left = run(e2, pose: .twoFingers, seconds: 1.0) { t in
             Vec2(t < 0.3 ? 0.9 : max(0.5, 0.9 - (t - 0.3) / 0.25 * 0.4), 0.5)
         }

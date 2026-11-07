@@ -47,7 +47,7 @@ final class MediaController {
     }
 
     func perform(_ action: GestureAction) {
-        if action == .pointerPress || action == .pointerRelease { return }  // handled by CursorController
+        if action == .pointerPress || action == .pointerRelease || action == .pointerRightClick { return }  // CursorController
         print("[AirDial] \(action.rawValue)\(dryRun ? " (dry run)" : "")")
         guard !dryRun else { return }
 
@@ -79,7 +79,8 @@ final class MediaController {
             case .volumeDown: postMediaKey(.soundDown)
             case .nextTrack: postMediaKey(.next)
             case .previousTrack: postMediaKey(.previous)
-            case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .exitFullScreen, .enterFullScreen: break
+            case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .pointerRightClick,
+                 .exitFullScreen, .enterFullScreen: break
             }
             return
         }
@@ -93,7 +94,8 @@ final class MediaController {
             tellPlayer("next track")
         case .previousTrack:
             tellPlayer("previous track")
-        case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .exitFullScreen, .enterFullScreen:
+        case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .pointerRightClick,
+             .exitFullScreen, .enterFullScreen:
             break
         }
     }

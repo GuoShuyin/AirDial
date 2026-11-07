@@ -13,7 +13,7 @@ import Foundation
 /// the size of the hand) presses the button, opening them releases it. The pointer freezes at
 /// where it was just before the pinch started, in case the pinch moves the index tip.
 public struct PointerTracker {
-    public enum Event: Equatable { case press, release }
+    public enum Event: Equatable { case press, release, rightClick }
 
     public private(set) var position: Vec2?     // normalized [0, 1]², y up
     /// Smoothed fingertip in camera coordinates (frozen during a pinch), for calibrated mapping.
@@ -31,6 +31,10 @@ public struct PointerTracker {
     private var frozenAt: Vec2?
     private var lastTip: Vec2?
     private var lastPalm: (t: Double, p: Vec2)?
+    private var lastFarLeft: Double = -.infinity    // last time the thumb was away from the fingertip
+    private var lastFarRight: Double = -.infinity   // ... and from the middle finger's second knuckle
+    private var rightFrames = 0
+    private var rightLatched = false
     private var config: GestureConfig
 
     public init(config: GestureConfig = GestureConfig()) {
@@ -55,6 +59,10 @@ public struct PointerTracker {
         frozenAt = nil
         lastTip = nil
         lastPalm = nil
+        rightFrames = 0
+        rightLatched = false
+        lastFarLeft = -.infinity
+        lastFarRight = -.infinity
         filter.reset()
         return wasPressed ? .release : nil
     }
@@ -80,8 +88,26 @@ public struct PointerTracker {
         }
         // 3D: the real distance between the fingertips. 2D: relative to the knuckle width.
         var pinchDistance: (d: Double, close: Double, open: Double)?
+        var freezeDistance: Double?       // nearest click target, for freezing the pointer
+        var mustTap = false               // 3D: the thumb has to come from further away (a tap)
         if let w = s.world, let tip3 = s.worldTip(c.pinchFinger) {
-            pinchDistance = (w[HandSample.worldThumbTip].distance(to: tip3), c.pinchClose3D, c.pinchOpen3D)
+            let thumb = w[HandSample.worldThumbTip]
+            let dL = thumb.distance(to: tip3)
+            // Right click: thumb tip tapping the middle finger's second knuckle (PIP).
+            let dR = c.enableRightClick ? thumb.distance(to: w[HandSample.worldJoints(.middle)[1]]) : Double.infinity
+            if dL > c.pinchOpen3D { lastFarLeft = t }
+            if dR > c.pinchOpen3D { lastFarRight = t }
+            freezeDistance = min(dL, dR)
+            mustTap = true
+            // The nearer target decides: a thumb on the knuckle is not also a left pinch.
+            pinchDistance = (dL <= dR ? dL : max(dL, c.pinchClose3D + 1e-6), c.pinchClose3D, c.pinchOpen3D)
+
+            if dR < c.pinchClose3D, dR < dL, speed < c.pinchMaxSpeed { rightFrames += 1 }
+            else if dR > c.pinchOpen3D { rightFrames = 0; rightLatched = false }
+            if !rightLatched, rightFrames >= c.pinchFrames, t - lastFarRight <= c.tapWindow {
+                rightLatched = true
+                event = .rightClick
+            }
         } else if let thumb = s.thumbTip, s.thumbConfidence >= c.pinchMinThumbConfidence, let scale = PointerTracker.handScale(s),
                   let pinchTip = s.tip(c.pinchFinger) {
             pinchDistance = (thumb.distance(to: pinchTip) / scale, c.pinchCloseRatio, c.pinchOpenRatio)
@@ -92,7 +118,7 @@ public struct PointerTracker {
             if d < closeAt, pressed || speed < c.pinchMaxSpeed { closedFrames += 1; openFrames = 0 }
             else if d > openAt { openFrames += 1; closedFrames = 0 }
             else if speed >= c.pinchMaxSpeed { closedFrames = 0 }
-            if !pressed, closedFrames >= c.pinchFrames {
+            if !pressed, closedFrames >= c.pinchFrames, !mustTap || t - lastFarLeft <= c.tapWindow, event == nil {
                 pressed = true
                 event = .press
             } else if pressed, openFrames >= c.pinchReleaseFrames {
@@ -102,10 +128,11 @@ public struct PointerTracker {
                 event = .release
             }
             // Freeze as soon as the fingers start closing, at where the pointer was before.
-            if frozenAt == nil, d < openAt, let before = history.first(where: { t - $0.t <= c.pinchFreezeLookback }) {
+            let fd = freezeDistance ?? d
+            if frozenAt == nil, fd < openAt, let before = history.first(where: { t - $0.t <= c.pinchFreezeLookback }) {
                 frozenAt = before.p
                 frozenTip = tipHistory.first(where: { t - $0.t <= c.pinchFreezeLookback })?.p
-            } else if !pressed, d > openAt {
+            } else if !pressed, !rightLatched, fd > openAt {
                 frozenAt = nil
                 frozenTip = nil
             }

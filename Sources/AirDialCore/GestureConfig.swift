@@ -175,6 +175,11 @@ public struct GestureConfig {
     /// 3D (MediaPipe): thumb tip to pinch fingertip distance in metres: below = pinched, above = open.
     public var pinchClose3D: Double = 0.025
     public var pinchOpen3D: Double = 0.04
+    /// 3D: a click must be a tap. The thumb has to have been further than the open distance from
+    /// the target within this long before (a thumb simply resting there doesn't click).
+    public var tapWindow: Double = 0.6
+    /// 3D: thumb tip tapping the middle finger's second knuckle = right click.
+    public var enableRightClick: Bool = true
     /// The thumb tip must be seen with at least this confidence (it is often just guessed).
     public var pinchMinThumbConfidence: Float = 0.4
     /// The hand must be nearly still to press (palm centre speed, image heights / s): you stop to

@@ -263,6 +263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             switch a {
             case .pointerPress: cursor.press()
             case .pointerRelease: cursor.release()
+            case .pointerRightClick: cursor.rightClick()
             default: media.perform(a)
             }
         }
@@ -325,6 +326,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .missionControl: return "🪟 Mission Control"
         case .pointerPress: return "🖱 Click"
         case .pointerRelease: return ""
+        case .pointerRightClick: return "🖱 Right click"
         case .exitFullScreen: return "✊ Exit full screen"
         case .enterFullScreen: return "🖐 Full screen"
         }

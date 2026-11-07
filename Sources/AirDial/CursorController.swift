@@ -90,12 +90,23 @@ final class CursorController {
         print("[AirDial] Click at (\(Int(at.x)), \(Int(at.y)))")
     }
 
+    func rightClick() {
+        guard canPost() else { print("[AirDial] Right click ignored: dry run or no Accessibility permission."); return }
+        guard Date() >= pausedUntil else { print("[AirDial] Right click ignored: you just used the real mouse."); return }
+        guard let at = lastPosted ?? currentMouse else { return }
+        postButton(.rightMouseDown, at: at, button: .right)
+        postButton(.rightMouseUp, at: at, button: .right)
+        clickSound?.stop()
+        clickSound?.play()
+        print("[AirDial] Right click at (\(Int(at.x)), \(Int(at.y)))")
+    }
+
     /// The pinch opened again: nothing to do, the click was already complete.
     func release() {}
 
-    private func postButton(_ type: CGEventType, at p: CGPoint) {
+    private func postButton(_ type: CGEventType, at p: CGPoint, button: CGMouseButton = .left) {
         guard let e = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: type,
-                              mouseCursorPosition: p, mouseButton: .left) else { return }
+                              mouseCursorPosition: p, mouseButton: button) else { return }
         e.setIntegerValueField(.mouseEventClickState, value: 1)  // a single click, as a real mouse reports it
         e.post(tap: .cghidEventTap)
     }

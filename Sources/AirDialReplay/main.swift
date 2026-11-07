@@ -139,5 +139,5 @@ print("raw:    \(fmt(rawCounts))")
 print("active: \(fmt(poseCounts))")
 var counts: [GestureAction: Int] = [:]
 for (_, a) in actions { counts[a, default: 0] += 1 }
-print("actions: " + [GestureAction.volumeUp, .volumeDown, .nextTrack, .previousTrack, .desktopLeft, .desktopRight, .missionControl, .pointerPress, .exitFullScreen, .enterFullScreen].map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " "))
+print("actions: " + [GestureAction.volumeUp, .volumeDown, .nextTrack, .previousTrack, .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRightClick, .exitFullScreen, .enterFullScreen].map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " "))
 print("action times: " + actions.map { String(format: "%.1f:%@", $0.0, $0.1.rawValue) }.joined(separator: " "))

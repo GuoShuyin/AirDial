@@ -4,7 +4,8 @@ public enum GestureAction: String {
     case volumeUp, volumeDown, nextTrack, previousTrack
     case desktopLeft, desktopRight
     case missionControl
-    case pointerPress, pointerRelease   // thumb-index pinch: mouse button down / up
+    case pointerPress, pointerRelease   // thumb-middle tap: click / fingers opened again
+    case pointerRightClick              // thumb taps the middle finger's second knuckle
     case exitFullScreen                 // open palm -> fist ("grab")
     case enterFullScreen                // fist -> open palm ("release")
 }
@@ -95,6 +96,7 @@ public final class GestureEngine {
                 switch pointer.update(s, time: time, aspect: aspect) {
                 case .press?: actions.append(.pointerPress)
                 case .release?: actions.append(.pointerRelease)
+                case .rightClick?: actions.append(.pointerRightClick)
                 case nil: break
                 }
             } else if activePose != .point, status.pointer != nil || pointer.pressed {

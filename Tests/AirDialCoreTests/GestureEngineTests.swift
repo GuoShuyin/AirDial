@@ -21,6 +21,7 @@ private func hand(pose: HandPose, tipAt tip: Vec2, time: Double, spread: Double 
     switch pose {
     case .point: ext = [.index: true, .middle: false, .ring: false, .little: false]
     case .twoFingers: ext = [.index: true, .middle: true, .ring: false, .little: false]
+    case .fist: ext = [.index: false, .middle: false, .ring: false, .little: false]
     default: ext = [.index: true, .middle: true, .ring: true, .little: true]
     }
     let dxs: [Finger: Double] = [.index: -0.03, .middle: 0.0, .ring: 0.03, .little: 0.06]
@@ -165,6 +166,40 @@ struct GestureEngineTests {
             Vec2(0.8, t < 1.8 ? 0.95 : max(0.55, 0.95 - (t - 1.8) / 0.25 * 0.4))
         }
         #expect(actions == [.missionControl, .missionControl])
+    }
+
+    /// Feed a sequence of (shape, seconds) with the hand held still in the middle of the frame.
+    private func shapes(_ e: GestureEngine, _ seq: [(HandPose, Double)]) -> [GestureAction] {
+        var out: [GestureAction] = []
+        var t = 0.0
+        for (pose, seconds) in seq {
+            let end = t + seconds
+            while t < end {
+                let s: HandSample? = pose == .none ? nil : hand(pose: pose, tipAt: Vec2(0.66, 0.6), time: t, spread: 1.7)
+                out += e.process(s, time: t)
+                t += 1.0 / fps
+            }
+        }
+        return out
+    }
+
+    @Test func testClosingTheHandMinimizesAndOpeningItGoesFullScreen() {
+        #expect(shapes(GestureEngine(), [(.other, 0.6), (.fist, 0.5)]) == [.minimizeWindow])
+        #expect(shapes(GestureEngine(), [(.fist, 0.6), (.other, 0.5)]) == [.fullScreen])
+    }
+
+    @Test func testOpeningTheHandRightAfterMinimizingDoesNothing() {
+        // Grab (minimize), then relax the hand open again: no full screen.
+        #expect(shapes(GestureEngine(), [(.other, 0.6), (.fist, 0.5), (.other, 0.6), (.fist, 0.4)]) == [.minimizeWindow])
+        // ...but after the hand leaves for a moment, it works again.
+        #expect(shapes(GestureEngine(), [(.other, 0.6), (.fist, 0.5), (.none, 0.6), (.fist, 0.5), (.other, 0.5)])
+                == [.minimizeWindow, .fullScreen])
+    }
+
+    @Test func testPalmFistMisreadWhilePointingDoesNothing() {
+        // Pointing, with a palm-then-fist misread in the middle (as recorded while circling).
+        let acts = shapes(GestureEngine(), [(.point, 0.6), (.other, 0.2), (.fist, 0.2), (.point, 0.6)])
+        #expect(!acts.contains(.minimizeWindow) && !acts.contains(.fullScreen))
     }
 
     @Test func testNarrowHandPassingThroughDoesNotSwitchDesktop() {

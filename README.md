@@ -15,6 +15,8 @@ Mid-air, BMW-style gestures for music on macOS, using the regular built-in webca
 | 🖐 Open palm facing the camera, quick swipe **right** | Desktop (Space) on the left |
 | 🖐 Open palm, quick swipe **left** | Desktop (Space) on the right |
 | 🖐 Open palm, quick swipe **up or down** | Mission Control (all windows); do it again to close it |
+| 🖐 → ✊ Close your open hand into a fist | Minimize the front window (Cmd+M) |
+| ✊ → 🖐 Open a fist into an open hand | Full screen for the front window (Ctrl+Cmd+F; toggles) |
 
 ## How it works (and why no training is needed)
 
@@ -25,7 +27,8 @@ Mid-air, BMW-style gestures for music on macOS, using the regular built-in webca
 5. **Palm swipes** (desktops, Mission Control): the palm centre travels 25% of the frame height within 0.3 s, and the palm must look wide (index-to-little knuckle distance at least 14% of the frame height). A deliberate swipe shows the palm flat to the camera from up close (measured 0.135–0.17); a hand passing by or resting near the keyboard is edge-on or further away (0.08–0.12). With `--palm-hold` the palm must also be held still for 0.25 s first, which removes the remaining rare false triggers. Up and down both send Control+↑, which macOS itself treats as a toggle: once opens Mission Control, again closes it.
 6. **Finger cursor**: the index fingertip is mapped from a "reach" rectangle in the camera frame onto your displays as arranged in System Settings → Displays: side by side horizontally, and vertically over whichever display is under that point (they may be offset). The reach rectangle starts small in the middle of the frame and grows to include wherever your fingertip goes, so it is twitchy at first and calibrates itself as you move. Moving the real mouse or trackpad pauses the finger cursor for 1.5 s.
    **Pinch to click** is strict, because in 2D the thumb and index tips often *look* close while you point at the camera (a loose rule gave 18–37 false clicks per minute-long circle recording; these rules give 0). The tips must almost touch (within 18% of the knuckle width), Vision must actually see the thumb (confidence ≥ 0.4), the hand must be nearly still, and all of that for 4 frames. The cursor freezes where it was just before the pinch, so the click lands where you pointed.
-7. **False-trigger protection**: One Euro filtering against jitter; a hand shape must be seen for 3 frames to start (10 frames to switch directly between two gestures). It is only dropped after 0.5 s without it, because the model misreads a finger for several frames in a row whenever it turns towards the camera. Swipes have a 0.8 s cooldown, and the reverse motion of bringing your hand back is ignored for 1.4 s. The gestures lock each other out for 0.6 s after any action.
+7. **Fist and open hand**: each shape must be seen for 4 frames in a row with the palm facing the camera, and the second must follow the first within 0.4 s. Afterwards the hand is "spent": opening your hand again after a minimize (the natural thing to do) does not go full screen. Show something else or take the hand away for 0.4 s to use it again. Palm/fist readings while you point or use two fingers are ignored (the model misreads a pointing finger as a fist).
+8. **False-trigger protection**: One Euro filtering against jitter; a hand shape must be seen for 3 frames to start (10 frames to switch directly between two gestures). It is only dropped after 0.5 s without it, because the model misreads a finger for several frames in a row whenever it turns towards the camera. Swipes have a 0.8 s cooldown, and the reverse motion of bringing your hand back is ignored for 1.4 s. The gestures lock each other out for 0.6 s after any action.
 
 All thresholds live in [`Sources/AirDialCore/GestureConfig.swift`](Sources/AirDialCore/GestureConfig.swift); `--sensitivity` scales the main ones.
 
@@ -71,6 +74,7 @@ Palm swipes send Control+← / Control+→ / Control+↑. These are macOS's defa
 .build/release/AirDial --palm-follows      # palm right = desktop on the right
 .build/release/AirDial --palm-hold         # strict: hold the palm still briefly before swiping
 .build/release/AirDial --no-cursor         # don't move the mouse cursor with the index finger
+.build/release/AirDial --no-hand-shapes    # disable fist = minimize / open hand = full screen
 .build/release/AirDial --list-cameras      # list cameras (pick one with --camera NAME)
 .build/release/AirDial --debug             # print the hand shape of every frame
 .build/release/AirDial --log frames.csv    # write per-frame diagnostics (see below)
@@ -82,6 +86,7 @@ Palm swipes send Control+← / Control+→ / Control+↑. These are macOS's defa
 - Circles: about a fist wide, 0.5–2 s per loop. When the dot turns green the "knob" is engaged; keep turning to keep adjusting.
 - Tracks: make the V and swipe once, crisply. To swipe again quickly, relax your fingers before bringing your hand back.
 - Cursor: sweep your pointing finger to the furthest left / right / top / bottom you want to reach once; after that the mapping is calibrated. To click, stop, then pinch thumb and index together briefly.
+- Minimize / full screen act on the frontmost window. Click into the app you want first, not the AirDial preview.
 - Desktops / Mission Control: show an open palm flat to the camera and swipe quickly. The preview says "Ready: swipe now" while the palm is recognised.
 - More light is better. Backlight (a window behind you) makes it noticeably worse.
 
@@ -107,6 +112,7 @@ Sources/AirDialCore/    Gesture logic only (no camera, unit-testable)
   HandPose.swift        Hand shape classification
   CircleTracker.swift   Circle detection
   SwipeDetector.swift   Swipe detection
+  HandShapeTransition.swift  Open hand <-> fist
   PointerTracker.swift  Finger cursor: self-calibrating reach, smoothing, pinch to click
   ScreenMapper.swift    Pointer position -> point on your arranged displays
   GestureEngine.swift   Debouncing, filtering, dispatch

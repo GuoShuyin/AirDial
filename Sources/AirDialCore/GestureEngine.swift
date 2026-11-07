@@ -5,6 +5,8 @@ public enum GestureAction: String {
     case desktopLeft, desktopRight
     case missionControl
     case pointerPress, pointerRelease   // thumb-index pinch: mouse button down / up
+    case minimizeWindow                 // open palm -> fist
+    case fullScreen                     // fist -> open palm
 }
 
 /// What the engine is doing right now (for the on-screen overlay).
@@ -37,6 +39,8 @@ public final class GestureEngine {
     private var swipe = SwipeDetector()
     private var palmSwipe = SwipeDetector()
     private var pointer: PointerTracker
+    private var handShape = HandShapeTransition()
+    private var handShapeBlockedUntil: Double = -.infinity
     private var palmFilter: OneEuroFilter2D
     private var palmBlockedUntil: Double = -.infinity
     private var lastPalm: (p: Vec2, t: Double)?
@@ -62,6 +66,17 @@ public final class GestureEngine {
         status.pose = activePose
 
         var actions: [GestureAction] = []
+
+        // Open palm <-> fist (uses the raw shape: these are quick changes, not held poses).
+        // While pointing / circling or using two fingers, palm and fist readings are misreads.
+        let shapeRaw = activePose == .point || activePose == .twoFingers ? HandPose.other : raw
+        if config.enableHandShapes, let kind = handShape.add(raw: shapeRaw, sample: sample, time: time, config: config),
+           time >= handShapeBlockedUntil {
+            actions.append(kind == .grab ? .minimizeWindow : .fullScreen)
+            palmBlockedUntil = time + config.crossGestureLockout
+            circleBlockedUntil = time + config.crossGestureLockout
+            swipeBlockedUntil = time + config.crossGestureLockout
+        }
 
         // Pointer: follows the index fingertip while the one-finger pose is active.
         if config.enablePointer {
@@ -151,10 +166,11 @@ public final class GestureEngine {
                     let goLeft = (dir == .right) == config.palmRightGoesLeft
                     actions.append(goLeft ? .desktopLeft : .desktopRight)
                 }
+                handShapeBlockedUntil = time + config.crossGestureLockout
                 circleBlockedUntil = time + config.crossGestureLockout
                 swipeBlockedUntil = time + config.crossGestureLockout
             }
-        case .none, .other:
+        case .none, .other, .fist:
             status.cursor = nil
         }
 

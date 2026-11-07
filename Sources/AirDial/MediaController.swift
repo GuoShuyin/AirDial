@@ -36,6 +36,19 @@ final class MediaController {
         print("[AirDial] \(action.rawValue)\(dryRun ? " (dry run)" : "")")
         guard !dryRun else { return }
 
+        if action == .minimizeWindow || action == .fullScreen {
+            guard hasAccessibility else {
+                print("[AirDial] Minimize / full screen need Accessibility permission for your terminal app.")
+                return
+            }
+            if action == .minimizeWindow {
+                postKey(46, [.maskCommand])                  // Cmd+M: minimize the front window
+            } else {
+                postKey(3, [.maskCommand, .maskControl])     // Ctrl+Cmd+F: toggle full screen
+            }
+            return
+        }
+
         if action == .desktopLeft || action == .desktopRight || action == .missionControl {
             guard hasAccessibility else {
                 print("[AirDial] Desktops and Mission Control need Accessibility permission for your terminal app.")
@@ -55,7 +68,7 @@ final class MediaController {
             case .volumeDown: postMediaKey(.soundDown)
             case .nextTrack: postMediaKey(.next)
             case .previousTrack: postMediaKey(.previous)
-            case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease: break
+            case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .minimizeWindow, .fullScreen: break
             }
             return
         }
@@ -69,7 +82,7 @@ final class MediaController {
             tellPlayer("next track")
         case .previousTrack:
             tellPlayer("previous track")
-        case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease:
+        case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .minimizeWindow, .fullScreen:
             break
         }
     }
@@ -93,6 +106,15 @@ final class MediaController {
         }
         send(down: true)
         send(down: false)
+    }
+
+    private func postKey(_ key: CGKeyCode, _ flags: CGEventFlags) {
+        let src = CGEventSource(stateID: .hidSystemState)
+        for down in [true, false] {
+            let e = CGEvent(keyboardEventSource: src, virtualKey: key, keyDown: down)
+            e?.flags = flags
+            e?.post(tap: .cghidEventTap)
+        }
     }
 
     /// Control + ←/→/↑: the default shortcuts "Move left/right a space" and "Mission Control".

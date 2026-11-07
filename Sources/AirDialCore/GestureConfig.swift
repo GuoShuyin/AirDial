@@ -100,6 +100,15 @@ public struct GestureConfig {
     /// true: palm moves right = go to the desktop on the left (like dragging the desktops along).
     public var palmRightGoesLeft: Bool = true
 
+    // MARK: Open palm <-> fist: minimize / full screen
+    public var enableHandShapes: Bool = true
+    /// Frames each shape must be seen in a row (the model briefly reads a pointing finger as a fist).
+    public var handShapeFrames: Int = 4
+    /// Max time between the end of the first shape and the start of the second.
+    public var handShapeGap: Double = 0.4
+    /// After a transition fires, the hand must show something else (or leave) this long first.
+    public var handShapeResetTime: Double = 0.4
+
     // MARK: Pointer (index finger = mouse cursor, thumb-index pinch = click)
     public var enablePointer: Bool = true
     /// Starting size of the reach rectangle (fraction of the frame height / width) that maps to

@@ -42,6 +42,7 @@ public enum HandPose: String {
     case point       // only index finger extended  -> circle = volume
     case twoFingers  // index + middle extended     -> swipe = track
     case openPalm    // index + middle + ring extended -> sideways swipe = switch desktop
+    case fist        // all fingers curled                -> palm <-> fist = minimize / full screen
     case other       // open palm, fist, etc.
 }
 
@@ -90,6 +91,9 @@ public enum PoseClassifier {
         }
         if index == .extended, middle == .curled, ringFolded, littleFolded {
             return .point
+        }
+        if index == .curled, middle == .curled, ringFolded, littleFolded, ring == .curled || little == .curled {
+            return .fist
         }
         return .other
     }

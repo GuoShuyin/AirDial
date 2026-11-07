@@ -45,10 +45,18 @@ final class VoiceAgent {
         var seen = startCount
         watchTimer = Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
-            if Date() > deadline { t.invalidate(); return }
+            if Date() > deadline {
+                t.invalidate()
+                self.report(seen == startCount ? "Dictation: no text arrived from the dictation app."
+                                               : "Dictation: no \"\(self.triggerWord)\" in it, typed normally.")
+                return
+            }
             guard pb.changeCount != seen else { return }
             seen = pb.changeCount
-            guard let text = pb.string(forType: .string), let command = self.command(in: text) else { return }
+            guard let text = pb.string(forType: .string), let command = self.command(in: text) else {
+                if pb.string(forType: .string) != nil { t.invalidate(); self.report("Dictation: no \"\(self.triggerWord)\" in it, typed normally.") }
+                return
+            }
             t.invalidate()
             // Let the paste land, then take it back out and run the command instead.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {

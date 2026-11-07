@@ -12,6 +12,9 @@ struct Options {
     var listCameras = false
     var cameraName: String?
     var logPath: String?
+    var tracker = "auto"        // auto | mediapipe | vision
+    var pythonPath: String?
+    var modelPath: String?
     var config = GestureConfig()
 
     static let usage = """
@@ -27,6 +30,9 @@ struct Options {
       --headless          No preview window (runs in the background, Ctrl+C to quit)
       --dry-run           Recognize gestures but don't change volume / tracks
       --debug             Print the raw pose of every frame
+      --tracker NAME      mediapipe (3D, default when installed) or vision (Apple Vision, 2D)
+      --python PATH       Python with mediapipe installed (default: .venv/bin/python3, or $AIRDIAL_PYTHON)
+      --model PATH        MediaPipe hand model (default: models/hand_landmarker.task)
       --log FILE          Write per-frame diagnostics (CSV) to FILE
       --camera NAME       Use the camera whose name contains NAME
       --list-cameras      List cameras and exit
@@ -58,6 +64,15 @@ struct Options {
             case "--dry-run": o.dryRun = true
             case "--debug": o.debug = true
             case "--list-cameras": o.listCameras = true
+            case "--tracker":
+                i += 1
+                if i < args.count { o.tracker = args[i] }
+            case "--python":
+                i += 1
+                if i < args.count { o.pythonPath = args[i] }
+            case "--model":
+                i += 1
+                if i < args.count { o.modelPath = args[i] }
             case "--log":
                 i += 1
                 if i < args.count { o.logPath = args[i] }
@@ -174,6 +189,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             let cam = try tracker.configure(cameraNameContains: options.cameraName)
             print("[AirDial] Camera: \(cam.localizedName)")
+            if options.tracker != "vision" {
+                if let found = MediaPipeBackend.locate(python: options.pythonPath, model: options.modelPath),
+                   let mp = MediaPipeBackend(python: found.python, script: found.script, model: found.model) {
+                    tracker.mediaPipe = mp
+                    print("[AirDial] Hand tracking: MediaPipe (3D joints), \(found.python)")
+                } else if options.tracker == "mediapipe" {
+                    print("[AirDial] MediaPipe was requested but isn't available; using Apple Vision.")
+                }
+            }
+            if tracker.mediaPipe == nil { print("[AirDial] Hand tracking: Apple Vision (2D joints)") }
         } catch {
             print("[AirDial] \(error.localizedDescription)")
             NSApp.terminate(nil)
@@ -185,7 +210,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             log = FileHandle(forWritingAtPath: path)
             log?.write(("t,vision_ms,dropped,hand_conf,wrist,indexTip,indexPIP,middleTip,middlePIP,ringTip,littleTip," +
                         "raw_pose,active_pose,tip_x,tip_y,cursor_x,cursor_y,circle_deg,engaged,action," +
-                        HandTracker.logJoints.map { "\($0.0)_x,\($0.0)_y,\($0.0)_c" }.joined(separator: ",") + "\n").data(using: .utf8)!)
+                        HandTracker.logJoints.map { "\($0.0)_x,\($0.0)_y,\($0.0)_c" }.joined(separator: ",") + "," +
+                        (0..<21).map { "w\($0)_x,w\($0)_y,w\($0)_z" }.joined(separator: ",") + "\n").data(using: .utf8)!)
             print("[AirDial] Logging frames to \(path)")
         }
 
@@ -231,6 +257,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 for p in info.rawJoints {
                     cols += [String(format: "%.4f", p.x), String(format: "%.4f", p.y), String(format: "%.2f", p.c)]
                 }
+            }
+            if info.world.count == 21 {
+                for p in info.world { cols += [String(format: "%.4f", p.x), String(format: "%.4f", p.y), String(format: "%.4f", p.z)] }
+            } else {
+                cols += Array(repeating: "", count: 21 * 3)
             }
             log.write((cols.joined(separator: ",") + "\n").data(using: .utf8)!)
         }

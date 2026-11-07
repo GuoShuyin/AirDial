@@ -12,6 +12,8 @@ struct FrameInfo {
     var jointConf: [String: Float] = [:]
     /// All joints in AirDial coordinates (mirrored, y up, units of image height) + confidence, in `HandTracker.logJoints` order.
     var rawJoints: [(x: Double, y: Double, c: Float)] = []
+    /// 3D joints (AirDial convention), MediaPipe only.
+    var world: [Vec3] = []
 }
 
 /// Captures webcam frames and runs Apple Vision's pretrained hand-pose model on each one.
@@ -31,6 +33,8 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
 
     /// Called on the video queue with the hand (nil if none), frame timestamp (s) and frame aspect (w/h).
     var onFrame: ((HandSample?, Double, Double, FrameInfo) -> Void)?
+    /// When set, hands come from MediaPipe (3D); otherwise from Apple Vision (2D).
+    var mediaPipe: MediaPipeBackend?
     private var droppedCount = 0
 
     static func availableCameras() -> [AVCaptureDevice] {
@@ -72,7 +76,8 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
 
         let output = AVCaptureVideoDataOutput()
         output.alwaysDiscardsLateVideoFrames = true
-        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange]
+        // BGRA: what the MediaPipe tracker reads; Vision is fine with it too.
+        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         output.setSampleBufferDelegate(self, queue: videoQueue)
         guard session.canAddOutput(output) else {
             throw NSError(domain: "AirDial", code: 3, userInfo: [NSLocalizedDescriptionKey: "Cannot add video output"])
@@ -138,6 +143,18 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         info.droppedBefore = droppedCount
         droppedCount = 0
 
+        if let mp = mediaPipe, let pb = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            let t0 = CFAbsoluteTimeGetCurrent()
+            if let hands = mp.detect(pb, time: time) {
+                let sample = hands.first.map { makeSample($0, time: time, aspect: aspect, info: &info) }
+                info.visionMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000
+                onFrame?(sample, time, aspect, info)
+                return
+            }
+            print("[AirDial] MediaPipe tracker stopped; falling back to Apple Vision.")
+            mediaPipe = nil
+        }
+
         let handler = VNImageRequestHandler(cmSampleBuffer: sampleBuffer, orientation: .up, options: [:])
         var sample: HandSample?
         let t0 = CFAbsoluteTimeGetCurrent()
@@ -168,6 +185,24 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
 
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         droppedCount += 1
+    }
+
+    private func makeSample(_ h: MediaPipeBackend.Hand, time: Double, aspect: Double, info: inout FrameInfo) -> HandSample {
+        // MediaPipe: normalized, origin top-left, not mirrored. AirDial: mirrored, y up, units of image height.
+        func pt(_ i: Int) -> Vec2 { Vec2((1.0 - h.image[i].x) * aspect, 1.0 - h.image[i].y) }
+        // World: x right / y down in the camera's view -> mirror x, flip y (two flips keep handedness).
+        let world = h.world.map { Vec3(-$0.x, -$0.y, $0.z) }
+        func joints(_ f: Finger) -> HandSample.FingerJoints {
+            let j = HandSample.worldJoints(f)
+            return .init(tip: pt(j[3]), pip: pt(j[1]), mcp: pt(j[0]))
+        }
+        info.handConfidence = h.score
+        for k in ["wrist", "indexTip", "indexPIP", "middleTip", "middlePIP", "ringTip", "littleTip"] { info.jointConf[k] = h.score }
+        info.rawJoints = (0..<21).map { let p = pt($0); return (p.x, p.y, h.score) }
+        info.world = world
+        return HandSample(time: time, wrist: pt(0),
+                          fingers: [.index: joints(.index), .middle: joints(.middle), .ring: joints(.ring), .little: joints(.little)],
+                          thumbTip: pt(4), thumbConfidence: h.score, world: world.isEmpty ? nil : world)
     }
 
     private func makeSample(_ obs: VNHumanHandPoseObservation, time: Double, aspect: Double) -> HandSample? {

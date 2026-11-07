@@ -67,13 +67,19 @@ public struct PointerTracker {
             if let last = lastPalm, t > last.t { speed = palm.distance(to: last.p) / (t - last.t) }
             lastPalm = (t, palm)
         }
-        if let thumb = s.thumbTip, s.thumbConfidence >= c.pinchMinThumbConfidence, let scale = PointerTracker.handScale(s),
-           let pinchTip = s.tip(c.pinchFinger) {
-            let d = thumb.distance(to: pinchTip) / scale
+        // 3D: the real distance between the fingertips. 2D: relative to the knuckle width.
+        var pinchDistance: (d: Double, close: Double, open: Double)?
+        if let w = s.world, let tip3 = s.worldTip(c.pinchFinger) {
+            pinchDistance = (w[HandSample.worldThumbTip].distance(to: tip3), c.pinchClose3D, c.pinchOpen3D)
+        } else if let thumb = s.thumbTip, s.thumbConfidence >= c.pinchMinThumbConfidence, let scale = PointerTracker.handScale(s),
+                  let pinchTip = s.tip(c.pinchFinger) {
+            pinchDistance = (thumb.distance(to: pinchTip) / scale, c.pinchCloseRatio, c.pinchOpenRatio)
+        }
+        if let (d, closeAt, openAt) = pinchDistance {
             // In between the two thresholds neither counter moves: a single slightly-off frame
             // in the middle of a pinch must not restart it.
-            if d < c.pinchCloseRatio, pressed || speed < c.pinchMaxSpeed { closedFrames += 1; openFrames = 0 }
-            else if d > c.pinchOpenRatio { openFrames += 1; closedFrames = 0 }
+            if d < closeAt, pressed || speed < c.pinchMaxSpeed { closedFrames += 1; openFrames = 0 }
+            else if d > openAt { openFrames += 1; closedFrames = 0 }
             else if speed >= c.pinchMaxSpeed { closedFrames = 0 }
             if !pressed, closedFrames >= c.pinchFrames {
                 pressed = true
@@ -84,9 +90,9 @@ public struct PointerTracker {
                 event = .release
             }
             // Freeze as soon as the fingers start closing, at where the pointer was before.
-            if frozenAt == nil, d < c.pinchOpenRatio, let before = history.first(where: { t - $0.t <= c.pinchFreezeLookback }) {
+            if frozenAt == nil, d < openAt, let before = history.first(where: { t - $0.t <= c.pinchFreezeLookback }) {
                 frozenAt = before.p
-            } else if !pressed, d > c.pinchOpenRatio {
+            } else if !pressed, d > openAt {
                 frozenAt = nil
             }
         }

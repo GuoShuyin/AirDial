@@ -4,6 +4,10 @@ import Foundation
 /// (1.0 = full camera frame height). Angles are in degrees, times in seconds.
 public struct GestureConfig {
     // MARK: Pose classification
+    /// 3D (MediaPipe): a finger bent less than this (PIP + DIP angle, degrees) is extended...
+    public var bendExtendedMax: Double = 60
+    /// ...and more than this is curled.
+    public var bendCurledMin: Double = 100
     /// tip-to-wrist / pip-to-wrist above this => finger extended.
     public var extendedRatio: Double = 1.12
     /// tip-to-wrist / pip-to-wrist below this => finger curled.
@@ -28,6 +32,12 @@ public struct GestureConfig {
     public var knobThumbOut: Double = 0.6
     /// A bigger turn between two frames is a keypoint glitch.
     public var knobMaxTurnPerFrame: Double = 40
+    /// 3D grip: thumb tip to index tip and to middle tip both within this range (metres), as if
+    /// holding a knob, and not pinched.
+    public var knobGripMin3D: Double = 0.03
+    public var knobGripMax3D: Double = 0.11
+    /// Flip the 3D turning direction (if turning right lowers the volume on your setup).
+    public var knobReverse3D: Bool = false
 
     // MARK: Circle (one finger) -> volume
     /// Off by default: one finger is the mouse cursor, and circling it fought with pointing.
@@ -150,6 +160,9 @@ public struct GestureConfig {
     /// Re-arm threshold: the fingers only need to part a little before the next click
     /// (with 0.6 people kept the "button" held for seconds, turning clicks into drags).
     public var pinchOpenRatio: Double = 0.35
+    /// 3D (MediaPipe): thumb tip to pinch fingertip distance in metres: below = pinched, above = open.
+    public var pinchClose3D: Double = 0.025
+    public var pinchOpen3D: Double = 0.04
     /// The thumb tip must be seen with at least this confidence (it is often just guessed).
     public var pinchMinThumbConfidence: Float = 0.4
     /// The hand must be nearly still to press (palm centre speed, image heights / s): you stop to

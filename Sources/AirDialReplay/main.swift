@@ -77,6 +77,19 @@ func joint(_ row: [String], _ name: String) -> Vec2? {
     return Vec2(x, y)
 }
 
+let hasWorld = header.contains("w0_x")
+func worldJoints(_ row: [String]) -> [Vec3]? {
+    guard hasWorld else { return nil }
+    let base = col("w0_x")
+    guard row.count >= base + 63 else { return nil }
+    var out: [Vec3] = []
+    for i in 0..<21 {
+        guard let x = Double(row[base + 3 * i]), let y = Double(row[base + 3 * i + 1]), let z = Double(row[base + 3 * i + 2]) else { return nil }
+        out.append(Vec3(x, y, z))
+    }
+    return out
+}
+
 let engine = GestureEngine(config: config)
 var poseCounts: [HandPose: Int] = [:]
 var rawCounts: [HandPose: Int] = [:]
@@ -92,7 +105,8 @@ for row in lines.dropFirst() {
         sample = HandSample(time: t, wrist: joint(row, "wrist"),
                             fingers: [.index: fj("index"), .middle: fj("middle"), .ring: fj("ring"), .little: fj("little")],
                             thumbTip: joint(row, "thumbTip"),
-                            thumbConfidence: Float(row[col("thumbTip_c")]) ?? 0)
+                            thumbConfidence: Float(row[col("thumbTip_c")]) ?? 0,
+                            world: worldJoints(row))
     }
     let acts = engine.process(sample, time: t, aspect: 4.0 / 3.0)
     poseCounts[engine.status.pose, default: 0] += 1

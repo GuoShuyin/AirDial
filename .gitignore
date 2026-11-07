@@ -4,3 +4,6 @@
 xcuserdata/
 .DS_Store
 Package.resolved
+models/
+.venv/
+__pycache__/

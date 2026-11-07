@@ -25,13 +25,42 @@ public struct HandSample {
     public var thumbTip: Vec2?
     /// Vision's confidence in the thumb tip (the thumb is often guessed when hidden behind the hand).
     public var thumbConfidence: Float
+    /// 3D joints in metres around the hand's centre, when the tracker provides them (MediaPipe),
+    /// in MediaPipe order: 0 wrist, 1-4 thumb (CMC, MCP, IP, tip), then MCP, PIP, DIP, tip for
+    /// index (5-8), middle (9-12), ring (13-16) and little finger (17-20).
+    public var world: [Vec3]?
 
-    public init(time: Double, wrist: Vec2?, fingers: [Finger: FingerJoints], thumbTip: Vec2? = nil, thumbConfidence: Float = 1) {
+    public init(time: Double, wrist: Vec2?, fingers: [Finger: FingerJoints], thumbTip: Vec2? = nil, thumbConfidence: Float = 1,
+                world: [Vec3]? = nil) {
         self.time = time
         self.wrist = wrist
         self.fingers = fingers
         self.thumbTip = thumbTip
         self.thumbConfidence = thumbConfidence
+        self.world = world.flatMap { $0.count == 21 ? $0 : nil }
+    }
+
+    /// World joint indices (MCP, PIP, DIP, tip) of a finger.
+    public static func worldJoints(_ f: Finger) -> [Int] {
+        switch f {
+        case .index: return [5, 6, 7, 8]
+        case .middle: return [9, 10, 11, 12]
+        case .ring: return [13, 14, 15, 16]
+        case .little: return [17, 18, 19, 20]
+        }
+    }
+    public static let worldThumbTip = 4
+    public static let worldWrist = 0
+
+    /// 3D tip position of a finger.
+    public func worldTip(_ f: Finger) -> Vec3? { world.map { $0[HandSample.worldJoints(f)[3]] } }
+
+    /// How much a finger is bent, degrees: angle at the PIP plus angle at the DIP (3D only).
+    /// About 0-40 for a straight finger, 150+ for a finger curled into a fist.
+    public func bend(_ f: Finger) -> Double? {
+        guard let w = world else { return nil }
+        let j = HandSample.worldJoints(f).map { w[$0] }
+        return (j[1] - j[0]).angle(to: j[2] - j[1]) + (j[2] - j[1]).angle(to: j[3] - j[2])
     }
 
     public func tip(_ f: Finger) -> Vec2? { fingers[f]?.tip }
@@ -54,6 +83,12 @@ public enum PoseClassifier {
     /// A finger is "extended" when its tip is clearly farther from the wrist than its PIP joint.
     /// Using ratios of distances makes this independent of how far the hand is from the camera.
     public static func state(of f: Finger, in s: HandSample, config: GestureConfig) -> FingerState {
+        // With 3D joints the bend angle decides, which doesn't depend on the viewing angle.
+        if let b = s.bend(f) {
+            if b <= config.bendExtendedMax { return .extended }
+            if b >= config.bendCurledMin { return .curled }
+            return .unknown
+        }
         guard let wrist = s.wrist, let j = s.fingers[f], let tip = j.tip, let pip = j.pip else {
             return .unknown
         }

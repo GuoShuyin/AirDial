@@ -199,7 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             preview = p
         }
         tracker.start()
-        print("[AirDial] Running. ☝️ draw circles for volume, ✌️ swipe for tracks." + (options.headless ? " Ctrl+C to quit." : ""))
+        print("[AirDial] Running. ☝️ point = cursor, 🤏 turn = volume, ✌️ swipe = next track, 🖐 swipe = desktops." + (options.headless ? " Ctrl+C to quit." : ""))
     }
 
     private func handle(_ sample: HandSample?, time: Double, aspect: Double, info: FrameInfo) {

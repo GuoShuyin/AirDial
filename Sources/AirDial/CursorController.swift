@@ -74,24 +74,21 @@ final class CursorController {
     /// Audible feedback so you can tell a pinch was recognised.
     var clickSound = NSSound(named: "Tink")
 
+    /// A pinch is one complete click: button down and up at the same spot. (Holding the button
+    /// for the length of the pinch made the cursor drift between down and up, so apps saw drags.)
     func press() {
         guard canPost() else { print("[AirDial] Click ignored: dry run or no Accessibility permission."); return }
         guard Date() >= pausedUntil else { print("[AirDial] Click ignored: you just used the real mouse."); return }
         guard let at = lastPosted ?? currentMouse else { return }
         postButton(.leftMouseDown, at: at)
-        buttonDown = true
+        postButton(.leftMouseUp, at: at)
         clickSound?.stop()
         clickSound?.play()
-        print("[AirDial] Mouse down at (\(Int(at.x)), \(Int(at.y)))")
+        print("[AirDial] Click at (\(Int(at.x)), \(Int(at.y)))")
     }
 
-    func release() {
-        guard buttonDown else { return }
-        buttonDown = false
-        guard let at = lastPosted ?? currentMouse else { return }
-        postButton(.leftMouseUp, at: at)
-        print("[AirDial] Mouse up at (\(Int(at.x)), \(Int(at.y)))")
-    }
+    /// The pinch opened again: nothing to do, the click was already complete.
+    func release() {}
 
     private func postButton(_ type: CGEventType, at p: CGPoint) {
         guard let e = CGEvent(mouseEventSource: CGEventSource(stateID: .hidSystemState), mouseType: type,

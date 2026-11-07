@@ -9,7 +9,7 @@ Mid-air, BMW-style gestures for music on macOS, using the regular built-in webca
 | 🤏 Thumb, index and middle finger as if holding a knob, **turn right** | Volume + (one step per 35°) |
 | 🤏 Same grip, **turn left** | Volume − |
 | ☝️ Index finger, **point** | Moves the mouse cursor, across all your displays |
-| ☝️ While pointing, **pinch** thumb and middle finger together | Left click (pinch and hold to drag) |
+| ☝️ While pointing, **pinch** thumb and middle finger together | Left click (one pinch = one click) |
 | ✌️ Index + middle finger (V), quick swipe **up or down** | Next track |
 | ✌️ V, swipe right / left | Next / previous track |
 | 🖐 Open palm facing the camera, quick swipe **right** | Desktop (Space) on the left |

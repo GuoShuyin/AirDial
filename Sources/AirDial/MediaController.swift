@@ -24,6 +24,21 @@ final class MediaController {
 
     var hasAccessibility: Bool { AXIsProcessTrusted() }
 
+    /// The last app other than AirDial that was frontmost. Clicking the AirDial preview makes it
+    /// the front app, and window actions should still go to the app you were using.
+    private var lastOtherApp: NSRunningApplication?
+
+    init() {
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
+                                                          object: nil, queue: .main) { [weak self] note in
+            if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+               app.processIdentifier != getpid() {
+                self?.lastOtherApp = app
+            }
+        }
+        if let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != getpid() { lastOtherApp = front }
+    }
+
     /// Shows the system prompt asking the user to grant Accessibility permission.
     @discardableResult
     func requestAccessibility() -> Bool {
@@ -111,12 +126,17 @@ final class MediaController {
     /// through the Accessibility API; if it hasn't changed 0.6 s later, Ctrl+Cmd+F (the toggle)
     /// is sent, which is safe then because we know the window is in the other state.
     private func setFrontWindowFullScreen(_ on: Bool) {
-        guard let app = NSWorkspace.shared.frontmostApplication else { return }
-        let name = app.localizedName ?? "front app"
-        guard app.processIdentifier != getpid() else {
-            print("[AirDial] The AirDial preview is the front window; click into the app you want first.")
-            return
+        guard var app = NSWorkspace.shared.frontmostApplication else { return }
+        if app.processIdentifier == getpid() {
+            // The AirDial preview is in front: act on the app you were using before it.
+            guard let other = lastOtherApp, !other.isTerminated else {
+                print("[AirDial] Full screen: no other app to act on yet; click into the app you want first.")
+                return
+            }
+            other.activate()
+            app = other
         }
+        let name = app.localizedName ?? "front app"
         let axApp = AXUIElementCreateApplication(app.processIdentifier)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &value) == .success,

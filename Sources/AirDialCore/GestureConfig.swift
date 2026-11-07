@@ -147,7 +147,9 @@ public struct GestureConfig {
     /// Strict, because in 2D the fingertips often *look* close while pointing at the camera:
     /// with 0.35 and no other checks, circle recordings produced 18-37 false clicks each.
     public var pinchCloseRatio: Double = 0.18
-    public var pinchOpenRatio: Double = 0.6
+    /// Re-arm threshold: the fingers only need to part a little before the next click
+    /// (with 0.6 people kept the "button" held for seconds, turning clicks into drags).
+    public var pinchOpenRatio: Double = 0.35
     /// The thumb tip must be seen with at least this confidence (it is often just guessed).
     public var pinchMinThumbConfidence: Float = 0.4
     /// The hand must be nearly still to press (palm centre speed, image heights / s): you stop to

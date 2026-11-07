@@ -86,9 +86,11 @@ for row in lines.dropFirst() {
     if row.count > col("wrist_c"), !row[col("wrist_c")].isEmpty {
         func fj(_ f: String) -> HandSample.FingerJoints { .init(tip: joint(row, "\(f)Tip"), pip: joint(row, "\(f)PIP"), mcp: joint(row, "\(f)MCP")) }
         sample = HandSample(time: t, wrist: joint(row, "wrist"),
-                            fingers: [.index: fj("index"), .middle: fj("middle"), .ring: fj("ring"), .little: fj("little")])
+                            fingers: [.index: fj("index"), .middle: fj("middle"), .ring: fj("ring"), .little: fj("little")],
+                            thumbTip: joint(row, "thumbTip"),
+                            thumbConfidence: Float(row[col("thumbTip_c")]) ?? 0)
     }
-    let acts = engine.process(sample, time: t)
+    let acts = engine.process(sample, time: t, aspect: 4.0 / 3.0)
     poseCounts[engine.status.pose, default: 0] += 1
     rawCounts[engine.status.rawPose, default: 0] += 1
     for a in acts { actions.append((t - t0, a)) }
@@ -119,5 +121,5 @@ print("raw:    \(fmt(rawCounts))")
 print("active: \(fmt(poseCounts))")
 var counts: [GestureAction: Int] = [:]
 for (_, a) in actions { counts[a, default: 0] += 1 }
-print("actions: " + [GestureAction.volumeUp, .volumeDown, .nextTrack, .previousTrack, .desktopLeft, .desktopRight, .missionControl].map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " "))
+print("actions: " + [GestureAction.volumeUp, .volumeDown, .nextTrack, .previousTrack, .desktopLeft, .desktopRight, .missionControl, .pointerPress].map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " "))
 print("action times: " + actions.map { String(format: "%.1f:%@", $0.0, $0.1.rawValue) }.joined(separator: " "))

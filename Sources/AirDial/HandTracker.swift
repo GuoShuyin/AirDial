@@ -186,6 +186,7 @@ final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
             .ring: .init(tip: pt(.ringTip), pip: pt(.ringPIP), mcp: pt(.ringMCP)),
             .little: .init(tip: pt(.littleTip), pip: pt(.littlePIP), mcp: pt(.littleMCP)),
         ]
-        return HandSample(time: time, wrist: pt(.wrist), fingers: fingers)
+        return HandSample(time: time, wrist: pt(.wrist), fingers: fingers, thumbTip: pt(.thumbTip),
+                          thumbConfidence: points[.thumbTip]?.confidence ?? 0)
     }
 }

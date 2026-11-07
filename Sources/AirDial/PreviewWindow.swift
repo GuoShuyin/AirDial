@@ -45,7 +45,7 @@ final class OverlayView: NSView {
         // Status text
         let poseText: String
         switch status.pose {
-        case .point: poseText = "☝️ One finger: circle for volume"
+        case .point: poseText = "☝️ One finger: point = cursor, circle = volume, pinch = click"
         case .twoFingers: poseText = "✌️ Two fingers: swipe for tracks"
         case .openPalm: poseText = "🖐 Open palm: swipe (sideways: desktops, up/down: Mission Control)"
         case .other: poseText = "Not a gesture"

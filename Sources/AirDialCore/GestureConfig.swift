@@ -100,6 +100,32 @@ public struct GestureConfig {
     /// true: palm moves right = go to the desktop on the left (like dragging the desktops along).
     public var palmRightGoesLeft: Bool = true
 
+    // MARK: Pointer (index finger = mouse cursor, thumb-index pinch = click)
+    public var enablePointer: Bool = true
+    /// Starting size of the reach rectangle (fraction of the frame height / width) that maps to
+    /// all screens. It grows to include wherever the fingertip goes.
+    public var pointerInitialReach: Double = 0.3
+    /// Smoothing (One Euro, in normalized screen units): low min cutoff = steady when still.
+    public var pointerMinCutoff: Double = 0.4
+    public var pointerBeta: Double = 4.0
+    /// Thumb tip to index tip distance / hand scale (knuckle width): below = pinched, above = open.
+    /// Strict, because in 2D the fingertips often *look* close while pointing at the camera:
+    /// with 0.35 and no other checks, circle recordings produced 18-37 false clicks each.
+    public var pinchCloseRatio: Double = 0.18
+    public var pinchOpenRatio: Double = 0.6
+    /// The thumb tip must be seen with at least this confidence (it is often just guessed).
+    public var pinchMinThumbConfidence: Float = 0.4
+    /// The hand must be nearly still to press (palm centre speed, image heights / s): you stop to
+    /// click, while circling or moving the pointer around is fast.
+    public var pinchMaxSpeed: Double = 0.5
+    /// A fingertip jump larger than this between frames is a glitch: it doesn't grow the reach.
+    public var pointerMaxJump: Double = 0.08
+    /// Frames in a row needed to press / to release.
+    public var pinchFrames: Int = 4
+    public var pinchReleaseFrames: Int = 2
+    /// When a pinch starts, the pointer goes back to where it was this long ago and stays there.
+    public var pinchFreezeLookback: Double = 0.2
+
     // MARK: Cross-gesture
     /// After any action, the *other* gesture is blocked for this long.
     public var crossGestureLockout: Double = 0.6

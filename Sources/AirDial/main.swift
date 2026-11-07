@@ -18,6 +18,7 @@ struct Options {
     AirDial — mid-air gestures for music on macOS (uses the built-in webcam)
 
       ☝️  Index finger, draw a circle   clockwise = volume up, counter-clockwise = volume down
+      ☝️  Index finger, point           moves the mouse cursor (all displays); pinch thumb + index = click
       ✌️  Two fingers (V), swipe        up or down = next track (right / left = next / previous)
       🖐  Open palm facing the camera, swipe   sideways = switch desktop, up or down = Mission Control on/off
 
@@ -35,6 +36,7 @@ struct Options {
       --no-vertical       Disable up/down swipes
       --no-desktops       Disable open-palm swipes (desktops and Mission Control)
       --no-mission-control  Disable open-palm up/down = Mission Control
+      --no-cursor         Don't move the mouse cursor with the index finger
       --palm-hold         Strict: hold the open palm still for a moment before it can swipe
       --palm-follows      Palm right = desktop on the right (default: palm right = desktop on the left)
       --sensitivity X     0.5 (strict) ... 1.5 (sensitive), default 1.0
@@ -66,6 +68,7 @@ struct Options {
             case "--no-mission-control": o.config.enablePalmVerticalSwipe = false
             case "--palm-follows": o.config.palmRightGoesLeft = false
             case "--palm-hold": o.config.palmRequireHold = true
+            case "--no-cursor": o.config.enablePointer = false
             case "--sensitivity":
                 i += 1
                 if i < args.count, let s = Double(args[i]), s > 0 {
@@ -95,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let options: Options
     let tracker = HandTracker()
     let media = MediaController()
+    let cursor = CursorController()
     let engine: GestureEngine
     var preview: PreviewWindowController?
     var trail: [Vec2] = []
@@ -106,6 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         engine = GestureEngine(config: options.config)
         super.init()
         media.dryRun = options.dryRun
+        cursor.dryRun = options.dryRun
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -189,8 +194,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handle(_ sample: HandSample?, time: Double, aspect: Double, info: FrameInfo) {
-        let actions = engine.process(sample, time: time)
-        for a in actions { media.perform(a) }
+        let actions = engine.process(sample, time: time, aspect: aspect)
+        if let p = engine.status.pointer { cursor.move(to: p) }
+        for a in actions {
+            switch a {
+            case .pointerPress: cursor.press()
+            case .pointerRelease: cursor.release()
+            default: media.perform(a)
+            }
+        }
 
         let status = engine.status
         if let log = log {
@@ -228,7 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlay.aspect = aspect
         overlay.status = status
         overlay.trail = trail
-        if let a = actions.last {
+        if let a = actions.last(where: { $0 != .pointerRelease }) {
             overlay.lastAction = (label(for: a), Date())
         }
         overlay.needsDisplay = true
@@ -243,6 +255,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .desktopLeft: return "⬅️ Desktop on the left"
         case .desktopRight: return "➡️ Desktop on the right"
         case .missionControl: return "🪟 Mission Control"
+        case .pointerPress: return "🖱 Click"
+        case .pointerRelease: return ""
         }
     }
 

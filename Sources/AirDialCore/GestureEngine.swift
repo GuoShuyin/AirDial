@@ -4,6 +4,7 @@ public enum GestureAction: String {
     case volumeUp, volumeDown, nextTrack, previousTrack
     case desktopLeft, desktopRight
     case missionControl
+    case pointerPress, pointerRelease   // thumb-index pinch: mouse button down / up
 }
 
 /// What the engine is doing right now (for the on-screen overlay).
@@ -14,6 +15,8 @@ public struct GestureStatus {
     public var circleDegrees: Double = 0
     public var circleEngaged = false
     public var palmArmed = false
+    public var pointer: Vec2?          // normalized [0, 1]², y up; nil = not pointing
+    public var pointerPressed = false
 
     public init() {}
 }
@@ -33,6 +36,7 @@ public final class GestureEngine {
     private var circle = CircleTracker()
     private var swipe = SwipeDetector()
     private var palmSwipe = SwipeDetector()
+    private var pointer: PointerTracker
     private var palmFilter: OneEuroFilter2D
     private var palmBlockedUntil: Double = -.infinity
     private var lastPalm: (p: Vec2, t: Double)?
@@ -46,16 +50,33 @@ public final class GestureEngine {
         self.config = config
         filter = OneEuroFilter2D(minCutoff: config.filterMinCutoff, beta: config.filterBeta)
         palmFilter = OneEuroFilter2D(minCutoff: config.filterMinCutoff, beta: config.filterBeta)
+        pointer = PointerTracker(config: config)
     }
 
     /// Feed one camera frame. `sample` is nil when no hand was detected.
-    public func process(_ sample: HandSample?, time: Double) -> [GestureAction] {
+    /// `aspect` = camera frame width / height (sample x coordinates run from 0 to aspect).
+    public func process(_ sample: HandSample?, time: Double, aspect: Double = 4.0 / 3.0) -> [GestureAction] {
         let raw = PoseClassifier.classify(sample, config: config)
         status.rawPose = raw
         updatePose(raw, time: time)
         status.pose = activePose
 
         var actions: [GestureAction] = []
+
+        // Pointer: follows the index fingertip while the one-finger pose is active.
+        if config.enablePointer {
+            if activePose == .point, let s = sample {
+                switch pointer.update(s, time: time, aspect: aspect) {
+                case .press?: actions.append(.pointerPress)
+                case .release?: actions.append(.pointerRelease)
+                case nil: break
+                }
+            } else if activePose != .point, status.pointer != nil || pointer.pressed {
+                if pointer.reset() == .release { actions.append(.pointerRelease) }
+            }
+            status.pointer = activePose == .point ? pointer.position : nil
+            status.pointerPressed = pointer.pressed
+        }
 
         switch activePose {
         case .point:

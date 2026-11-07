@@ -22,11 +22,16 @@ public struct HandSample {
     public var time: Double
     public var wrist: Vec2?
     public var fingers: [Finger: FingerJoints]
+    public var thumbTip: Vec2?
+    /// Vision's confidence in the thumb tip (the thumb is often guessed when hidden behind the hand).
+    public var thumbConfidence: Float
 
-    public init(time: Double, wrist: Vec2?, fingers: [Finger: FingerJoints]) {
+    public init(time: Double, wrist: Vec2?, fingers: [Finger: FingerJoints], thumbTip: Vec2? = nil, thumbConfidence: Float = 1) {
         self.time = time
         self.wrist = wrist
         self.fingers = fingers
+        self.thumbTip = thumbTip
+        self.thumbConfidence = thumbConfidence
     }
 
     public func tip(_ f: Finger) -> Vec2? { fingers[f]?.tip }

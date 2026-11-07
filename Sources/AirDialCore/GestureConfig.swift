@@ -4,6 +4,8 @@ import Foundation
 /// (1.0 = full camera frame height). Angles are in degrees, times in seconds.
 public struct GestureConfig {
     // MARK: Pose classification
+    /// While pointing, a fist reading counts as still pointing (pointing at the camera looks like a fist).
+    public var pointSticksThroughFist: Bool = true
     /// 3D (MediaPipe): a finger bent less than this (PIP + DIP angle, degrees) is extended...
     public var bendExtendedMax: Double = 60
     /// ...and more than this is curled.

@@ -264,6 +264,10 @@ public final class GestureEngine {
     }
 
     private func updatePose(_ raw: HandPose, time: Double) {
+        // Pointing straight at the camera makes the extended index finger look curled, so the hand
+        // reads as a fist (measured: ~150 degrees of bend instead of ~40). While pointing, a "fist"
+        // therefore keeps pointing; only another clear gesture or losing the hand ends it.
+        let raw = (activePose == .point && raw == .fist && config.pointSticksThroughFist) ? .point : raw
         if raw == activePose {
             lastActiveSeen = time
             candidatePose = raw

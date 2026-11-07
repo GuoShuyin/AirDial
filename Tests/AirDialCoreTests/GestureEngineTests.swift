@@ -224,6 +224,20 @@ struct GestureEngineTests {
         #expect(out == [.enterFullScreen])
     }
 
+    @Test func testPointingAtTheCameraKeepsTheCursor() {
+        // Pointing, then the finger turns towards the camera and reads as a fist for 2 s.
+        let e = GestureEngine()
+        var pointerFrames = 0
+        var t = 0.0
+        while t < 3.0 {
+            let pose: HandPose = t < 1.0 ? .point : .fist
+            _ = e.process(hand(pose: pose, tipAt: Vec2(0.6, 0.5), time: t, spread: 1.7), time: t)
+            if t > 1.0, e.status.pointer != nil { pointerFrames += 1 }
+            t += 1.0 / fps
+        }
+        #expect(pointerFrames >= 55)   // the cursor kept following the whole time
+    }
+
     @Test func testPalmFistMisreadWhilePointingDoesNothing() {
         // Pointing, with a palm-then-fist misread in the middle (as recorded while circling).
         let acts = shapes(GestureEngine(), [(.point, 0.6), (.other, 0.2), (.fist, 0.2), (.point, 0.6)])

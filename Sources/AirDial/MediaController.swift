@@ -36,16 +36,12 @@ final class MediaController {
         print("[AirDial] \(action.rawValue)\(dryRun ? " (dry run)" : "")")
         guard !dryRun else { return }
 
-        if action == .minimizeWindow || action == .fullScreen {
+        if action == .exitFullScreen || action == .enterFullScreen {
             guard hasAccessibility else {
-                print("[AirDial] Minimize / full screen need Accessibility permission for your terminal app.")
+                print("[AirDial] Full screen control needs Accessibility permission for your terminal app.")
                 return
             }
-            if action == .minimizeWindow {
-                postKey(46, [.maskCommand])                  // Cmd+M: minimize the front window
-            } else {
-                postKey(3, [.maskCommand, .maskControl])     // Ctrl+Cmd+F: toggle full screen
-            }
+            setFrontWindowFullScreen(action == .enterFullScreen)
             return
         }
 
@@ -68,7 +64,7 @@ final class MediaController {
             case .volumeDown: postMediaKey(.soundDown)
             case .nextTrack: postMediaKey(.next)
             case .previousTrack: postMediaKey(.previous)
-            case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .minimizeWindow, .fullScreen: break
+            case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .exitFullScreen, .enterFullScreen: break
             }
             return
         }
@@ -82,7 +78,7 @@ final class MediaController {
             tellPlayer("next track")
         case .previousTrack:
             tellPlayer("previous track")
-        case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .minimizeWindow, .fullScreen:
+        case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .exitFullScreen, .enterFullScreen:
             break
         }
     }
@@ -106,6 +102,32 @@ final class MediaController {
         }
         send(down: true)
         send(down: false)
+    }
+
+    /// Puts the front window into / out of full screen. Sets the state explicitly through the
+    /// Accessibility API (AXFullScreen) instead of the Ctrl+Cmd+F toggle, so "enter" never exits
+    /// and "exit" never enters. Falls back to the toggle only when the state can be read but not set.
+    private func setFrontWindowFullScreen(_ on: Bool) {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return }
+        guard app.processIdentifier != getpid() else {
+            print("[AirDial] The AirDial preview is the front window; click into the app you want first.")
+            return
+        }
+        let axApp = AXUIElementCreateApplication(app.processIdentifier)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &value) == .success,
+              let windowRef = value, CFGetTypeID(windowRef) == AXUIElementGetTypeID() else {
+            print("[AirDial] No focused window in \(app.localizedName ?? "the front app").")
+            return
+        }
+        let window = windowRef as! AXUIElement
+        let attr = "AXFullScreen" as CFString
+        var current: CFTypeRef?
+        let readable = AXUIElementCopyAttributeValue(window, attr, &current) == .success
+        let isFull = (current as? Bool) ?? false
+        if readable, isFull == on { return }  // already in the requested state
+        if AXUIElementSetAttributeValue(window, attr, (on ? kCFBooleanTrue : kCFBooleanFalse)!) == .success { return }
+        if readable { postKey(3, [.maskCommand, .maskControl]) }  // Ctrl+Cmd+F toggles; we know it's the other state
     }
 
     private func postKey(_ key: CGKeyCode, _ flags: CGEventFlags) {

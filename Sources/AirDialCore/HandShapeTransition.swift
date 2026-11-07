@@ -4,9 +4,10 @@ import Foundation
 ///
 /// Both shapes must be seen for `handShapeFrames` frames in a row with the palm facing the
 /// camera (wide knuckles), and the second shape must follow the first within `handShapeGap`.
-/// After a transition fires, the hand is "spent": opening the fist again after a grab (the
-/// natural thing to do) must not immediately fire a release. Further palm/fist changes are
-/// ignored until the hand shows something else or leaves the frame for `handShapeResetTime`.
+/// After a grab fires, the hand is "spent": relaxing the fist open again (the natural thing to
+/// do) must not immediately fire a release. Further palm/fist changes are ignored until the hand
+/// shows something else or leaves the frame for `handShapeResetTime`. After a release, closing
+/// the hand again is a deliberate grab and works straight away.
 public struct HandShapeTransition {
     public enum Kind: Equatable { case grab, release }
 
@@ -58,7 +59,7 @@ public struct HandShapeTransition {
         defer { lastConfirmed = (current, t) }
         guard let prev = lastConfirmed, prev.pose != current, runStart - prev.end <= c.handShapeGap else { return nil }
         if spent { return nil }
-        spent = true
+        spent = current == .fist
         return current == .fist ? .grab : .release
     }
 }

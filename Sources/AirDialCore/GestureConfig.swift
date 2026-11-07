@@ -106,8 +106,17 @@ public struct GestureConfig {
     public var handShapeFrames: Int = 4
     /// Max time between the end of the first shape and the start of the second.
     public var handShapeGap: Double = 0.4
-    /// After a transition fires, the hand must show something else (or leave) this long first.
+    /// After a grab fires, the hand must show something else (or leave) this long first.
     public var handShapeResetTime: Double = 0.4
+    /// Palm swipes and fist/open changes exclude each other: a palm swipe is dropped if a fist
+    /// was seen within this long before it, and after a fist/open change no palm swipe counts
+    /// for `handShapeSwipeLockout`. (Closing or opening the hand while raising it must not also
+    /// be a swipe up.)
+    public var palmFistExclusion: Double = 0.5
+    public var handShapeSwipeLockout: Double = 1.0
+    /// A detected palm swipe is only acted on after the hand stayed open this long (a fist
+    /// appearing in the meantime cancels it).
+    public var palmSwipeConfirm: Double = 0.1
 
     // MARK: Pointer (index finger = mouse cursor, thumb-index pinch = click)
     public var enablePointer: Bool = true

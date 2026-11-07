@@ -48,6 +48,10 @@ while i < args.count {
         case "palmArmedWindow": config.palmArmedWindow = v
         case "palmMinHeight": config.palmMinHeight = v
         case "palmMinWidth": config.palmMinWidth = v
+        case "pinchCloseRatio": config.pinchCloseRatio = v
+        case "pinchOpenRatio": config.pinchOpenRatio = v
+        case "pinchFrames": config.pinchFrames = Int(v)
+        case "pinchMaxSpeed": config.pinchMaxSpeed = v
         case "palmRequireHold": config.palmRequireHold = v != 0
         case "palmSwipeWindow": config.palmSwipeWindow = v
         case "palmTrackFingertips": config.palmTrackFingertips = v != 0
@@ -121,5 +125,5 @@ print("raw:    \(fmt(rawCounts))")
 print("active: \(fmt(poseCounts))")
 var counts: [GestureAction: Int] = [:]
 for (_, a) in actions { counts[a, default: 0] += 1 }
-print("actions: " + [GestureAction.volumeUp, .volumeDown, .nextTrack, .previousTrack, .desktopLeft, .desktopRight, .missionControl, .pointerPress, .minimizeWindow, .fullScreen].map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " "))
+print("actions: " + [GestureAction.volumeUp, .volumeDown, .nextTrack, .previousTrack, .desktopLeft, .desktopRight, .missionControl, .pointerPress, .exitFullScreen, .enterFullScreen].map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " "))
 print("action times: " + actions.map { String(format: "%.1f:%@", $0.0, $0.1.rawValue) }.joined(separator: " "))

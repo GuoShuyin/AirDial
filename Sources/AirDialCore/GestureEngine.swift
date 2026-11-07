@@ -5,8 +5,8 @@ public enum GestureAction: String {
     case desktopLeft, desktopRight
     case missionControl
     case pointerPress, pointerRelease   // thumb-index pinch: mouse button down / up
-    case minimizeWindow                 // open palm -> fist
-    case fullScreen                     // fist -> open palm
+    case exitFullScreen                 // open palm -> fist ("grab")
+    case enterFullScreen                // fist -> open palm ("release")
 }
 
 /// What the engine is doing right now (for the on-screen overlay).
@@ -41,6 +41,8 @@ public final class GestureEngine {
     private var pointer: PointerTracker
     private var handShape = HandShapeTransition()
     private var handShapeBlockedUntil: Double = -.infinity
+    private var lastFistSeen: Double = -.infinity
+    private var pendingPalm: (action: GestureAction, time: Double)?
     private var palmFilter: OneEuroFilter2D
     private var palmBlockedUntil: Double = -.infinity
     private var lastPalm: (p: Vec2, t: Double)?
@@ -70,10 +72,12 @@ public final class GestureEngine {
         // Open palm <-> fist (uses the raw shape: these are quick changes, not held poses).
         // While pointing / circling or using two fingers, palm and fist readings are misreads.
         let shapeRaw = activePose == .point || activePose == .twoFingers ? HandPose.other : raw
+        if raw == .fist { lastFistSeen = time }
         if config.enableHandShapes, let kind = handShape.add(raw: shapeRaw, sample: sample, time: time, config: config),
            time >= handShapeBlockedUntil {
-            actions.append(kind == .grab ? .minimizeWindow : .fullScreen)
-            palmBlockedUntil = time + config.crossGestureLockout
+            actions.append(kind == .grab ? .exitFullScreen : .enterFullScreen)
+            pendingPalm = nil
+            palmBlockedUntil = time + config.handShapeSwipeLockout
             circleBlockedUntil = time + config.crossGestureLockout
             swipeBlockedUntil = time + config.crossGestureLockout
         }
@@ -159,19 +163,35 @@ public final class GestureEngine {
             if armed, let dir = palmSwipe.add(p, time: time, config: pc) {
                 palmArmedUntil = -.infinity
                 palmStillSince = nil
+                let action: GestureAction
                 switch dir {
                 case .up, .down:
-                    actions.append(.missionControl)
+                    action = .missionControl
                 case .left, .right:
                     let goLeft = (dir == .right) == config.palmRightGoesLeft
-                    actions.append(goLeft ? .desktopLeft : .desktopRight)
+                    action = goLeft ? .desktopLeft : .desktopRight
                 }
+                // A fist just before means the hand was closing / opening, not swiping.
+                if time - lastFistSeen > config.palmFistExclusion {
+                    pendingPalm = (action, time)
+                    handShapeBlockedUntil = time + config.crossGestureLockout
+                }
+            }
+        case .none, .other, .fist:
+            status.cursor = nil
+        }
+
+        // Act on a palm swipe once the hand stayed open for a moment; a fist cancels it.
+        if let pending = pendingPalm {
+            if lastFistSeen >= pending.time {
+                pendingPalm = nil
+            } else if time - pending.time >= config.palmSwipeConfirm {
+                actions.append(pending.action)
+                pendingPalm = nil
                 handShapeBlockedUntil = time + config.crossGestureLockout
                 circleBlockedUntil = time + config.crossGestureLockout
                 swipeBlockedUntil = time + config.crossGestureLockout
             }
-        case .none, .other, .fist:
-            status.cursor = nil
         }
 
         status.circleDegrees = circle.displayDegrees

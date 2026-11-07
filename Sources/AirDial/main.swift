@@ -18,7 +18,7 @@ struct Options {
     AirDial — mid-air gestures for music on macOS (uses the built-in webcam)
 
       ☝️  Index finger, draw a circle   clockwise = volume up, counter-clockwise = volume down
-      🖐→✊ Close your open hand          minimize the front window;  ✊→🖐 open it: full screen
+      🖐→✊ Close your open hand          front window exits full screen;  ✊→🖐 open it: full screen
       ☝️  Index finger, point           moves the mouse cursor (all displays); pinch thumb + index = click
       ✌️  Two fingers (V), swipe        up or down = next track (right / left = next / previous)
       🖐  Open palm facing the camera, swipe   sideways = switch desktop, up or down = Mission Control on/off
@@ -37,7 +37,7 @@ struct Options {
       --no-vertical       Disable up/down swipes
       --no-desktops       Disable open-palm swipes (desktops and Mission Control)
       --no-mission-control  Disable open-palm up/down = Mission Control
-      --no-hand-shapes    Disable open palm -> fist = minimize, fist -> open palm = full screen
+      --no-hand-shapes    Disable fist = exit full screen, open hand = full screen
       --no-cursor         Don't move the mouse cursor with the index finger
       --palm-hold         Strict: hold the open palm still for a moment before it can swipe
       --palm-follows      Palm right = desktop on the right (default: palm right = desktop on the left)
@@ -260,8 +260,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .missionControl: return "🪟 Mission Control"
         case .pointerPress: return "🖱 Click"
         case .pointerRelease: return ""
-        case .minimizeWindow: return "✊ Minimize"
-        case .fullScreen: return "🖐 Full screen"
+        case .exitFullScreen: return "✊ Exit full screen"
+        case .enterFullScreen: return "🖐 Full screen"
         }
     }
 

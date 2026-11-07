@@ -69,9 +69,11 @@ public struct PointerTracker {
         }
         if let thumb = s.thumbTip, s.thumbConfidence >= c.pinchMinThumbConfidence, let scale = PointerTracker.handScale(s) {
             let d = thumb.distance(to: tip) / scale
+            // In between the two thresholds neither counter moves: a single slightly-off frame
+            // in the middle of a pinch must not restart it.
             if d < c.pinchCloseRatio, pressed || speed < c.pinchMaxSpeed { closedFrames += 1; openFrames = 0 }
             else if d > c.pinchOpenRatio { openFrames += 1; closedFrames = 0 }
-            else { closedFrames = 0 }
+            else if speed >= c.pinchMaxSpeed { closedFrames = 0 }
             if !pressed, closedFrames >= c.pinchFrames {
                 pressed = true
                 event = .press

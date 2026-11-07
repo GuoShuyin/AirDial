@@ -102,7 +102,13 @@ final class VoiceAgent {
         p.environment = env
         let out = Pipe()
         p.standardOutput = out
-        p.standardError = FileHandle.nullDevice
+        // Python tracebacks etc. go to a log file instead of being lost.
+        let logDir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0].appendingPathComponent("Logs/AirDial")
+        try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
+        let logURL = logDir.appendingPathComponent("agent.log")
+        FileManager.default.createFile(atPath: logURL.path, contents: nil)
+        p.standardError = (try? FileHandle(forWritingTo: logURL)) ?? FileHandle.nullDevice
+        var reported = false
         out.fileHandleForReading.readabilityHandler = { [weak self] h in
             let data = h.availableData
             guard !data.isEmpty, let s = String(data: data, encoding: .utf8) else { return }
@@ -110,11 +116,17 @@ final class VoiceAgent {
                 guard let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { continue }
                 let text = (obj["status"] ?? obj["done"] ?? obj["error"]).map { "\($0)" } ?? ""
                 let prefix = obj["done"] != nil ? "Agent done: " : (obj["error"] != nil ? "Agent error: " : "Agent: ")
+                if obj["done"] != nil || obj["error"] != nil { reported = true }
                 DispatchQueue.main.async { self?.report(prefix + text) }
             }
         }
-        p.terminationHandler = { [weak self] _ in
-            DispatchQueue.main.async { self?.process = nil }
+        p.terminationHandler = { [weak self] proc in
+            DispatchQueue.main.async {
+                self?.process = nil
+                if proc.terminationStatus != 0, !reported, proc.terminationReason == .exit {
+                    self?.report("Agent error: it stopped unexpectedly; details in ~/Library/Logs/AirDial/agent.log")
+                }
+            }
         }
         do {
             try p.run()

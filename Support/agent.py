@@ -336,5 +336,20 @@ def main():
     return 1
 
 
+SCREEN_RECORDING_HINT = ("Can't take a screenshot: give Screen Recording permission to the app you started "
+                         "AirDial from (System Settings > Privacy & Security > Screen & System Audio Recording), "
+                         "then quit and reopen that app.")
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except subprocess.CalledProcessError as e:
+        if e.cmd and e.cmd[0] == "screencapture":
+            emit(error=SCREEN_RECORDING_HINT)
+        else:
+            emit(error=f"{e.cmd[0]} failed: {(e.stderr or b'').decode(errors='replace').strip()}")
+        sys.exit(1)
+    except Exception as e:   # anything else: say what happened instead of dying silently
+        emit(error=f"{type(e).__name__}: {e}")
+        sys.exit(1)

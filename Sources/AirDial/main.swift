@@ -13,6 +13,7 @@ struct Options {
     var cameraName: String?
     var logPath: String?
     var tracker = "auto"        // auto | mediapipe | vision
+    var calibrate = true
     var pythonPath: String?
     var modelPath: String?
     var config = GestureConfig()
@@ -33,6 +34,7 @@ struct Options {
       --tracker NAME      mediapipe (3D, default when installed) or vision (Apple Vision, 2D)
       --python PATH       Python with mediapipe installed (default: .venv/bin/python3, or $AIRDIAL_PYTHON)
       --model PATH        MediaPipe hand model (default: models/hand_landmarker.task)
+      --no-calibrate      Skip the start-up cursor calibration and reuse the last one
       --log FILE          Write per-frame diagnostics (CSV) to FILE
       --camera NAME       Use the camera whose name contains NAME
       --list-cameras      List cameras and exit
@@ -64,6 +66,7 @@ struct Options {
             case "--dry-run": o.dryRun = true
             case "--debug": o.debug = true
             case "--list-cameras": o.listCameras = true
+            case "--no-calibrate": o.calibrate = false
             case "--tracker":
                 i += 1
                 if i < args.count { o.tracker = args[i] }
@@ -128,6 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var trail: [Vec2] = []
     var lastDebugPose: HandPose?
     var log: FileHandle?
+    var calibration: CalibrationController?
 
     init(options: Options) {
         self.options = options
@@ -225,12 +229,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             preview = p
         }
         tracker.start()
+
+        if options.config.enablePointer {
+            if options.calibrate && !options.dryRun {
+                let c = CalibrationController(screens: cursor.screens) { [weak self] result in
+                    if let r = result { self?.cursor.calibration = r }
+                    else if let saved = CalibrationController.loadSaved(for: self?.cursor.screens ?? []) {
+                        self?.cursor.calibration = saved
+                        print("[AirDial] Using the last saved calibration.")
+                    }
+                }
+                calibration = c
+                c.start()
+            } else if let saved = CalibrationController.loadSaved(for: cursor.screens) {
+                cursor.calibration = saved
+                print("[AirDial] Cursor: using the saved calibration.")
+            }
+        }
         print("[AirDial] Running. ☝️ point = cursor, 🤏 turn = volume, ✌️ swipe = next track, 🖐 swipe = desktops." + (options.headless ? " Ctrl+C to quit." : ""))
     }
 
     private func handle(_ sample: HandSample?, time: Double, aspect: Double, info: FrameInfo) {
         let actions = engine.process(sample, time: time, aspect: aspect)
-        if let p = engine.status.pointer { cursor.move(to: p) }
+        if let cal = calibration, cal.isActive {
+            // Calibrating: only collect fingertip positions; no cursor moves or actions.
+            cal.update(tip: engine.status.pointerTip, time: time)
+            preview?.overlay.status = engine.status
+            preview?.overlay.needsDisplay = true
+            return
+        }
+        if let p = engine.status.pointer { cursor.move(to: p, tip: engine.status.pointerTip) }
         for a in actions {
             switch a {
             case .pointerPress: cursor.press()

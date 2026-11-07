@@ -15,7 +15,9 @@ final class CursorController {
     /// After the real mouse moves, ignore the finger for this long (seconds).
     var userOverridePause: TimeInterval = 1.5
 
-    private var screens: [CGRect] = []   // global display coordinates (origin top-left of main display, y down)
+    private(set) var screens: [CGRect] = []   // global display coordinates (origin top-left of main display, y down)
+    /// When set, the fingertip is mapped through the start-up calibration instead of the automatic reach.
+    var calibration: PointerCalibration?
     private var lastPosted: CGPoint?
     private var pausedUntil = Date.distantPast
     private var buttonDown = false
@@ -56,9 +58,10 @@ final class CursorController {
         return true
     }
 
-    /// Called every frame while pointing.
-    func move(to p: Vec2) {
-        guard canPost(), let target = point(for: p) else { return }
+    /// Called every frame while pointing: `p` is the normalized pointer, `tip` the smoothed fingertip.
+    func move(to p: Vec2, tip: Vec2?) {
+        let calibrated = tip.flatMap { t in calibration.flatMap { $0.isValid(for: screens) ? $0.point(for: t) : nil } }
+        guard canPost(), let target = calibrated ?? point(for: p) else { return }
         // Did the user move the real mouse since our last move?
         if let last = lastPosted, let now = currentMouse, hypot(now.x - last.x, now.y - last.y) > 3, !buttonDown {
             pausedUntil = Date().addingTimeInterval(userOverridePause)

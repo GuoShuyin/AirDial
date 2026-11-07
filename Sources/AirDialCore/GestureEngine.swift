@@ -18,6 +18,7 @@ public struct GestureStatus {
     public var circleEngaged = false
     public var palmArmed = false
     public var pointer: Vec2?          // normalized [0, 1]², y up; nil = not pointing
+    public var pointerTip: Vec2?       // smoothed fingertip, camera coordinates (for calibration)
     public var pointerPressed = false
     public var knobDegrees: Double = 0
 
@@ -98,6 +99,7 @@ public final class GestureEngine {
                 if pointer.reset() == .release { actions.append(.pointerRelease) }
             }
             status.pointer = activePose == .point ? pointer.position : nil
+            status.pointerTip = activePose == .point ? pointer.tip : nil
             status.pointerPressed = pointer.pressed
         }
 

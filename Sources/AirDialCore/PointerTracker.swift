@@ -16,10 +16,15 @@ public struct PointerTracker {
     public enum Event: Equatable { case press, release }
 
     public private(set) var position: Vec2?     // normalized [0, 1]², y up
+    /// Smoothed fingertip in camera coordinates (frozen during a pinch), for calibrated mapping.
+    public private(set) var tip: Vec2?
     public private(set) var pressed = false
 
     private var range: (minX: Double, maxX: Double, minY: Double, maxY: Double)?
     private var filter: OneEuroFilter2D
+    private var tipFilter: OneEuroFilter2D
+    private var tipHistory: [(t: Double, p: Vec2)] = []
+    private var frozenTip: Vec2?
     private var history: [(t: Double, p: Vec2)] = []
     private var closedFrames = 0
     private var openFrames = 0
@@ -31,14 +36,20 @@ public struct PointerTracker {
     public init(config: GestureConfig = GestureConfig()) {
         self.config = config
         filter = OneEuroFilter2D(minCutoff: config.pointerMinCutoff, beta: config.pointerBeta)
+        // Camera units span roughly half the range of the normalized position: twice the beta.
+        tipFilter = OneEuroFilter2D(minCutoff: config.pointerMinCutoff, beta: config.pointerBeta * 2)
     }
 
     /// Hand lost / pose changed: release the button if it was down, keep the calibration.
     public mutating func reset() -> Event? {
         let wasPressed = pressed
         position = nil
+        tip = nil
         pressed = false
         history.removeAll()
+        tipHistory.removeAll()
+        frozenTip = nil
+        tipFilter.reset()
         closedFrames = 0
         openFrames = 0
         frozenAt = nil
@@ -87,13 +98,16 @@ public struct PointerTracker {
             } else if pressed, openFrames >= c.pinchReleaseFrames {
                 pressed = false
                 frozenAt = nil
+                frozenTip = nil
                 event = .release
             }
             // Freeze as soon as the fingers start closing, at where the pointer was before.
             if frozenAt == nil, d < openAt, let before = history.first(where: { t - $0.t <= c.pinchFreezeLookback }) {
                 frozenAt = before.p
+                frozenTip = tipHistory.first(where: { t - $0.t <= c.pinchFreezeLookback })?.p
             } else if !pressed, d > openAt {
                 frozenAt = nil
+                frozenTip = nil
             }
         }
 
@@ -117,6 +131,11 @@ public struct PointerTracker {
         while let first = history.first, t - first.t > c.pinchFreezeLookback { history.removeFirst() }
 
         position = frozenAt ?? p
+
+        let ft = tipFilter.filter(tip, time: t)
+        tipHistory.append((t, ft))
+        while let first = tipHistory.first, t - first.t > c.pinchFreezeLookback { tipHistory.removeFirst() }
+        self.tip = frozenTip ?? ft
         return event
     }
 }

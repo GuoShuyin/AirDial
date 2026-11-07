@@ -19,7 +19,7 @@ struct Options {
 
       ☝️  Index finger, draw a circle   clockwise = volume up, counter-clockwise = volume down
       ✌️  Two fingers (V), swipe        up or down = next track (right / left = next / previous)
-      🖐  Open palm, hold, then swipe   sideways = switch desktop, up or down = Mission Control on/off
+      🖐  Open palm facing the camera, swipe   sideways = switch desktop, up or down = Mission Control on/off
 
     Usage: AirDial [options]
       --headless          No preview window (runs in the background, Ctrl+C to quit)
@@ -35,6 +35,7 @@ struct Options {
       --no-vertical       Disable up/down swipes
       --no-desktops       Disable open-palm swipes (desktops and Mission Control)
       --no-mission-control  Disable open-palm up/down = Mission Control
+      --palm-hold         Strict: hold the open palm still for a moment before it can swipe
       --palm-follows      Palm right = desktop on the right (default: palm right = desktop on the left)
       --sensitivity X     0.5 (strict) ... 1.5 (sensitive), default 1.0
       -h, --help          Show this help
@@ -64,6 +65,7 @@ struct Options {
             case "--no-desktops": o.config.enablePalmSwipe = false
             case "--no-mission-control": o.config.enablePalmVerticalSwipe = false
             case "--palm-follows": o.config.palmRightGoesLeft = false
+            case "--palm-hold": o.config.palmRequireHold = true
             case "--sensitivity":
                 i += 1
                 if i < args.count, let s = Double(args[i]), s > 0 {

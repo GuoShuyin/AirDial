@@ -91,6 +91,21 @@ public enum PoseClassifier {
 }
 
 extension HandSample {
+    /// Mean of the fingertips: moves much more than the palm centre in a quick wrist flick.
+    public var fingertipCenter: Vec2? {
+        let tips = Finger.allCases.compactMap { fingers[$0]?.tip }
+        guard !tips.isEmpty else { return nil }
+        let n = Double(tips.count)
+        return Vec2(tips.reduce(0) { $0 + $1.x } / n, tips.reduce(0) { $0 + $1.y } / n)
+    }
+
+    /// Index MCP to little MCP distance: how wide the palm looks. Large when the palm faces the
+    /// camera from up close (a deliberate gesture), small when it is edge-on or far away.
+    public var palmWidth: Double? {
+        guard let a = fingers[.index]?.mcp, let b = fingers[.little]?.mcp else { return nil }
+        return a.distance(to: b)
+    }
+
     /// Centre of the palm: mean of the finger MCP joints (the wrist is often out of frame).
     public var palmCenter: Vec2? {
         let mcps = Finger.allCases.compactMap { fingers[$0]?.mcp }

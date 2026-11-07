@@ -47,7 +47,7 @@ final class OverlayView: NSView {
         switch status.pose {
         case .point: poseText = "☝️ One finger: circle for volume"
         case .twoFingers: poseText = "✌️ Two fingers: swipe for tracks"
-        case .openPalm: poseText = "🖐 Open palm: hold, then swipe (sideways: desktops, up/down: Mission Control)"
+        case .openPalm: poseText = "🖐 Open palm: swipe (sideways: desktops, up/down: Mission Control)"
         case .other: poseText = "Not a gesture"
         case .none: poseText = "No hand detected"
         }
@@ -56,7 +56,7 @@ final class OverlayView: NSView {
             lines.append(String(format: "Rotation %.0f°%@", status.circleDegrees, status.circleEngaged ? "  (engaged)" : ""))
         }
         if status.pose == .openPalm {
-            lines.append(status.palmArmed ? "Ready: swipe now" : "Hold your palm still…")
+            lines.append(status.palmArmed ? "Ready: swipe now" : "Face your palm to the camera…")
         }
         drawLabel(lines.joined(separator: "\n"), at: NSPoint(x: 14, y: bounds.height - 14), size: 16, topAligned: true)
 

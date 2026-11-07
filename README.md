@@ -10,9 +10,9 @@ Mid-air, BMW-style gestures for music on macOS, using the regular built-in webca
 | ☝️ Index finger only, draw a circle **counter-clockwise** | Volume − |
 | ✌️ Index + middle finger (V), quick swipe **up or down** | Next track |
 | ✌️ V, swipe right / left | Next / previous track |
-| 🖐 Open palm, **hold still for a moment**, then swipe **right** | Desktop (Space) on the left |
-| 🖐 Open palm, hold still, then swipe **left** | Desktop (Space) on the right |
-| 🖐 Open palm, hold still, then swipe **up or down** | Mission Control (all windows); do it again to close it |
+| 🖐 Open palm facing the camera, quick swipe **right** | Desktop (Space) on the left |
+| 🖐 Open palm, quick swipe **left** | Desktop (Space) on the right |
+| 🖐 Open palm, quick swipe **up or down** | Mission Control (all windows); do it again to close it |
 
 ## How it works (and why no training is needed)
 
@@ -20,7 +20,7 @@ Mid-air, BMW-style gestures for music on macOS, using the regular built-in webca
 2. **Hand shape**: for each finger, compare the tip-to-wrist distance with the PIP-to-wrist distance to decide whether it is extended. This separates ☝️ one finger / ✌️ two fingers / 🖐 open palm / anything else. Ratios rather than absolute distances, so it works at any distance from the camera.
 3. **Circles**: no circle fitting. AirDial adds up how much the direction of the fingertip's motion turns. One loop is ±360°; straight lines and back-and-forth motion add up to about 0. To start, the path must turn 270° or more, at least 85% of it in one direction, and be big enough, not flat and round enough. After that, every further full loop (360°) is one more volume step, so N loops give N steps. Turning back 120° from the furthest point reached stops the knob.
 4. **Swipes**: the midpoint of the two fingertips moves more than 16% of the frame height within 0.45 s, with the main-axis travel at least 1.8× the cross-axis travel. Up and down both mean "next track": on a webcam a swipe often starts with a quick wind-up the other way, so the two directions can't be told apart reliably (`--vertical-prev` restores down = previous).
-5. **Palm swipes** (desktops, Mission Control): the palm centre must first be held still for 0.25 s, above the bottom 35% of the frame, and then travel 25% of the frame height within 1 s. A hand passing through the frame (reaching for the mouse) never pauses, so it doesn't trigger anything. Up and down both send Control+↑, which macOS itself treats as a toggle: once opens Mission Control, again closes it.
+5. **Palm swipes** (desktops, Mission Control): the palm centre travels 25% of the frame height within 0.3 s, and the palm must look wide (index-to-little knuckle distance at least 14% of the frame height). A deliberate swipe shows the palm flat to the camera from up close (measured 0.135–0.17); a hand passing by or resting near the keyboard is edge-on or further away (0.08–0.12). With `--palm-hold` the palm must also be held still for 0.25 s first, which removes the remaining rare false triggers. Up and down both send Control+↑, which macOS itself treats as a toggle: once opens Mission Control, again closes it.
 6. **False-trigger protection**: One Euro filtering against jitter; a hand shape must be seen for 3 frames to start (10 frames to switch directly between two gestures). It is only dropped after 0.5 s without it, because the model misreads a finger for several frames in a row whenever it turns towards the camera. Swipes have a 0.8 s cooldown, and the reverse motion of bringing your hand back is ignored for 1.4 s. The gestures lock each other out for 0.6 s after any action.
 
 All thresholds live in [`Sources/AirDialCore/GestureConfig.swift`](Sources/AirDialCore/GestureConfig.swift); `--sensitivity` scales the main ones.
@@ -65,6 +65,7 @@ Palm swipes send Control+← / Control+→ / Control+↑. These are macOS's defa
 .build/release/AirDial --no-desktops       # disable all open-palm swipes
 .build/release/AirDial --no-mission-control  # disable open-palm up/down = Mission Control
 .build/release/AirDial --palm-follows      # palm right = desktop on the right
+.build/release/AirDial --palm-hold         # strict: hold the palm still briefly before swiping
 .build/release/AirDial --list-cameras      # list cameras (pick one with --camera NAME)
 .build/release/AirDial --debug             # print the hand shape of every frame
 .build/release/AirDial --log frames.csv    # write per-frame diagnostics (see below)
@@ -75,7 +76,7 @@ Palm swipes send Control+← / Control+→ / Control+↑. These are macOS's defa
 - Keep your hand 30–60 cm from the screen and **high enough that your wrist is in the frame**. With the wrist cut off at the bottom edge, recognition gets much worse.
 - Circles: about a fist wide, 0.5–2 s per loop. When the dot turns green the "knob" is engaged; keep turning to keep adjusting.
 - Tracks: make the V and swipe once, crisply. To swipe again quickly, relax your fingers before bringing your hand back.
-- Desktops / Mission Control: raise an open palm to the middle of the frame, hold it until the preview says "Ready: swipe now", then swipe. Without the pause nothing happens, on purpose.
+- Desktops / Mission Control: show an open palm flat to the camera and swipe quickly. The preview says "Ready: swipe now" while the palm is recognised.
 - More light is better. Backlight (a window behind you) makes it noticeably worse.
 
 ## Tuning on real recordings

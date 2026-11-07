@@ -3,7 +3,9 @@ import Testing
 @testable import AirDialCore
 
 /// Synthetic hands: the whole hand is translated so that the tracked fingertip follows a path.
-private func hand(pose: HandPose, tipAt tip: Vec2, time: Double) -> HandSample {
+/// `spread` scales the sideways spacing of the fingers: 1 = a narrow hand (palm width 0.09,
+/// like an edge-on hand), 1.7 = a palm facing the camera from up close (width ~0.15, measured).
+private func hand(pose: HandPose, tipAt tip: Vec2, time: Double, spread: Double = 1) -> HandSample {
     // Hand layout relative to the wrist (units of image height).
     let extendedTip = Vec2(0, 0.25), extendedPip = Vec2(0, 0.15)
     let curledTip = Vec2(0, 0.08), curledPip = Vec2(0, 0.12)
@@ -24,7 +26,7 @@ private func hand(pose: HandPose, tipAt tip: Vec2, time: Double) -> HandSample {
     let dxs: [Finger: Double] = [.index: -0.03, .middle: 0.0, .ring: 0.03, .little: 0.06]
 
     var fingers: [Finger: HandSample.FingerJoints] = [:]
-    for f in Finger.allCases { fingers[f] = joints(ext[f]!, dx: dxs[f]!) }
+    for f in Finger.allCases { fingers[f] = joints(ext[f]!, dx: dxs[f]! * spread) }
 
     // Translate so the tracked point (index tip, or index/middle midpoint) lands on `tip`.
     let rel: Vec2 = pose == .twoFingers
@@ -39,13 +41,13 @@ private func hand(pose: HandPose, tipAt tip: Vec2, time: Double) -> HandSample {
 
 private let fps = 30.0
 
-private func run(_ engine: GestureEngine, pose: HandPose, seconds: Double, start: Double = 0,
+private func run(_ engine: GestureEngine, pose: HandPose, seconds: Double, start: Double = 0, spread: Double = 1,
                  path: (Double) -> Vec2) -> [GestureAction] {
     var out: [GestureAction] = []
     let n = Int(seconds * fps)
     for i in 0..<n {
         let t = start + Double(i) / fps
-        let s = hand(pose: pose, tipAt: path(t - start), time: t)
+        let s = hand(pose: pose, tipAt: path(t - start), time: t, spread: spread)
         out += engine.process(s, time: t)
     }
     return out
@@ -140,13 +142,13 @@ struct GestureEngineTests {
         // Raise the palm, hold it still for a moment, then swipe.
         // Palm moves right -> desktop on the left (default), and vice versa.
         let e = GestureEngine()
-        let right = run(e, pose: .other, seconds: 1.3) { t in
+        let right = run(e, pose: .other, seconds: 1.3, spread: 1.7) { t in
             Vec2(t < 0.6 ? 0.4 : min(0.8, 0.4 + (t - 0.6) / 0.25 * 0.4), 0.65)
         }
         #expect(right == [.desktopLeft])
 
         let e2 = GestureEngine()
-        let left = run(e2, pose: .other, seconds: 1.3) { t in
+        let left = run(e2, pose: .other, seconds: 1.3, spread: 1.7) { t in
             Vec2(t < 0.6 ? 0.9 : max(0.5, 0.9 - (t - 0.6) / 0.25 * 0.4), 0.65)
         }
         #expect(left == [.desktopRight])
@@ -156,20 +158,38 @@ struct GestureEngineTests {
         // Hold, swipe up: Mission Control. Hold again, swipe down: Mission Control again (toggles it off).
         let e = GestureEngine()
         // (Fingertip heights; the palm centre sits ~0.16 lower and must stay above palmMinHeight to arm.)
-        var actions = run(e, pose: .other, seconds: 1.3) { t in
+        var actions = run(e, pose: .other, seconds: 1.3, spread: 1.7) { t in
             Vec2(0.8, t < 0.6 ? 0.55 : min(0.95, 0.55 + (t - 0.6) / 0.25 * 0.4))
         }
-        actions += run(e, pose: .other, seconds: 2.5, start: 1.3) { t in
+        actions += run(e, pose: .other, seconds: 2.5, start: 1.3, spread: 1.7) { t in
             Vec2(0.8, t < 1.8 ? 0.95 : max(0.55, 0.95 - (t - 1.8) / 0.25 * 0.4))
         }
         #expect(actions == [.missionControl, .missionControl])
     }
 
-    @Test func testOpenHandPassingThroughDoesNotSwitchDesktop() {
-        // An open hand moving across the frame without pausing first (e.g. reaching for the mouse).
+    @Test func testNarrowHandPassingThroughDoesNotSwitchDesktop() {
+        // An open hand seen edge-on / from afar (narrow palm) moving across the frame.
         let e = GestureEngine()
         let actions = run(e, pose: .other, seconds: 2.0) { t in Vec2(0.2 + 0.7 * t, 0.5 + 0.05 * sin(3 * t)) }
         #expect(actions == [])
+    }
+
+    @Test func testPalmHoldModeIgnoresPalmPassingThrough() {
+        // Strict mode: even a palm facing the camera doesn't count unless it pauses first.
+        var c = GestureConfig()
+        c.palmRequireHold = true
+        let e = GestureEngine(config: c)
+        let actions = run(e, pose: .other, seconds: 2.0, spread: 1.7) { t in Vec2(0.2 + 0.7 * t, 0.65 + 0.05 * sin(3 * t)) }
+        #expect(actions == [])
+    }
+
+    @Test func testPalmSwipesStraightAwayWithoutHolding() {
+        // Default: raise the palm and swipe immediately, no pause.
+        let e = GestureEngine()
+        let actions = run(e, pose: .other, seconds: 0.8, spread: 1.7) { t in
+            Vec2(t < 0.15 ? 0.4 : min(0.8, 0.4 + (t - 0.15) / 0.2 * 0.4), 0.65)
+        }
+        #expect(actions == [.desktopLeft])
     }
 
     @Test func testTwoFingerSwipeUpIsNextAndReturnIsIgnored() {

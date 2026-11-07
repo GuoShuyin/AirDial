@@ -47,6 +47,10 @@ while i < args.count {
         case "palmArmSeconds": config.palmArmSeconds = v
         case "palmArmedWindow": config.palmArmedWindow = v
         case "palmMinHeight": config.palmMinHeight = v
+        case "palmMinWidth": config.palmMinWidth = v
+        case "palmRequireHold": config.palmRequireHold = v != 0
+        case "palmSwipeWindow": config.palmSwipeWindow = v
+        case "palmTrackFingertips": config.palmTrackFingertips = v != 0
         case "palmMaxJump": config.palmMaxJump = v
         case "filterMinCutoff": config.filterMinCutoff = v
         case "filterBeta": config.filterBeta = v

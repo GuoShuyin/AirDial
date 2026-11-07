@@ -83,7 +83,8 @@ public final class GestureEngine {
                 }
             }
         case .openPalm:
-            guard config.enablePalmSwipe, let s = sample, let c = s.palmCenter else { break }
+            guard config.enablePalmSwipe, let s = sample,
+                  let c = config.palmTrackFingertips ? s.fingertipCenter : s.palmCenter else { break }
             let p = palmFilter.filter(c, time: time)
             status.cursor = p
             defer { lastPalmRaw = c }
@@ -99,10 +100,13 @@ public final class GestureEngine {
             }
             if let last = lastPalm, time > last.t {
                 let speed = p.distance(to: last.p) / (time - last.t)
-                if speed < config.palmStillSpeed, p.y >= config.palmMinHeight {
+                let still = !config.palmRequireHold || speed < config.palmStillSpeed
+                if still, p.y >= config.palmMinHeight, (s.palmWidth ?? 0) >= config.palmMinWidth {
                     let since = palmStillSince ?? time
                     palmStillSince = since
-                    if time - since >= config.palmArmSeconds { palmArmedUntil = time + config.palmArmedWindow }
+                    if !config.palmRequireHold || time - since >= config.palmArmSeconds {
+                        palmArmedUntil = time + config.palmArmedWindow
+                    }
                 } else {
                     palmStillSince = nil
                 }
@@ -113,6 +117,7 @@ public final class GestureEngine {
             pc.enableVerticalSwipe = config.enablePalmVerticalSwipe
             pc.enableHorizontalSwipe = true
             pc.swipeMinDistance = config.palmSwipeMinDistance
+            pc.swipeWindow = config.palmSwipeWindow
             let armed = time <= palmArmedUntil && time >= palmBlockedUntil
             if !armed { palmSwipe.observe(p, time: time, config: pc) }
             if armed, let dir = palmSwipe.add(p, time: time, config: pc) {

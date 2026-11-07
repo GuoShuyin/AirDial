@@ -75,15 +75,25 @@ public struct GestureConfig {
     /// Minimum sideways travel of the palm centre within `swipeWindow`.
     /// Larger than the two-finger swipe so that circling with an open hand doesn't switch desktops.
     public var palmSwipeMinDistance: Double = 0.25
-    /// The palm must be held still (slower than `palmStillSpeed`, image heights / s) for
-    /// `palmArmSeconds` before a swipe counts, and the swipe must start within `palmArmedWindow`.
-    /// An open hand passing through the frame (reaching for the mouse...) never pauses.
+    /// Strict mode (`--palm-hold`): the palm must be held still (slower than `palmStillSpeed`,
+    /// image heights / s) for `palmArmSeconds` before a swipe counts, and the swipe must start
+    /// within `palmArmedWindow`. Off by default: swiping straight away feels much better, and the
+    /// palm-width check below already rejects most hands that merely pass by.
+    public var palmRequireHold: Bool = false
     public var palmStillSpeed: Double = 0.35
     public var palmArmSeconds: Double = 0.25
     public var palmArmedWindow: Double = 1.0
-    /// The palm centre must be at least this high in the frame (0 = bottom, 1 = top) to arm:
-    /// hands resting near the keyboard sit at the bottom edge.
-    public var palmMinHeight: Double = 0.35
+    /// The palm centre must be at least this high in the frame (0 = bottom, 1 = top) to arm.
+    /// Off by default: people swipe sideways with the hand low in the frame (palm at 0.1-0.27).
+    public var palmMinHeight: Double = 0.0
+    /// Time window a palm swipe must happen within (shorter = must be quicker, like a flick).
+    public var palmSwipeWindow: Double = 0.3
+    /// Track the fingertips (true) or the palm centre (false) for palm swipes.
+    /// A wrist flick moves the fingertips a lot and the palm centre only a little.
+    public var palmTrackFingertips: Bool = false
+    /// The palm must look at least this wide (index MCP to little MCP, image heights) to arm.
+    /// Deliberate palm swipes measured 0.135-0.17; hands passing by / resting 0.08-0.12.
+    public var palmMinWidth: Double = 0.14
     /// A jump larger than this between two frames is a keypoint glitch, not hand motion.
     /// Kept large: a real palm swipe moves up to ~0.3 per frame, more when blurred frames drop out.
     public var palmMaxJump: Double = 1.0

@@ -141,15 +141,28 @@ struct GestureEngineTests {
         // Palm moves right -> desktop on the left (default), and vice versa.
         let e = GestureEngine()
         let right = run(e, pose: .other, seconds: 1.3) { t in
-            Vec2(t < 0.6 ? 0.4 : min(0.8, 0.4 + (t - 0.6) / 0.25 * 0.4), 0.5)
+            Vec2(t < 0.6 ? 0.4 : min(0.8, 0.4 + (t - 0.6) / 0.25 * 0.4), 0.65)
         }
         #expect(right == [.desktopLeft])
 
         let e2 = GestureEngine()
         let left = run(e2, pose: .other, seconds: 1.3) { t in
-            Vec2(t < 0.6 ? 0.9 : max(0.5, 0.9 - (t - 0.6) / 0.25 * 0.4), 0.5)
+            Vec2(t < 0.6 ? 0.9 : max(0.5, 0.9 - (t - 0.6) / 0.25 * 0.4), 0.65)
         }
         #expect(left == [.desktopRight])
+    }
+
+    @Test func testOpenPalmUpOrDownTogglesMissionControl() {
+        // Hold, swipe up: Mission Control. Hold again, swipe down: Mission Control again (toggles it off).
+        let e = GestureEngine()
+        // (Fingertip heights; the palm centre sits ~0.16 lower and must stay above palmMinHeight to arm.)
+        var actions = run(e, pose: .other, seconds: 1.3) { t in
+            Vec2(0.8, t < 0.6 ? 0.55 : min(0.95, 0.55 + (t - 0.6) / 0.25 * 0.4))
+        }
+        actions += run(e, pose: .other, seconds: 2.5, start: 1.3) { t in
+            Vec2(0.8, t < 1.8 ? 0.95 : max(0.55, 0.95 - (t - 1.8) / 0.25 * 0.4))
+        }
+        #expect(actions == [.missionControl, .missionControl])
     }
 
     @Test func testOpenHandPassingThroughDoesNotSwitchDesktop() {
@@ -174,8 +187,18 @@ struct GestureEngineTests {
         #expect(actions == [.nextTrack])
     }
 
-    @Test func testTwoFingerSwipeDownIsPrevious() {
+    @Test func testTwoFingerSwipeDownIsAlsoNextByDefault() {
         let e = GestureEngine()
+        let actions = run(e, pose: .twoFingers, seconds: 1.0) { t in
+            Vec2(0.66, t < 0.3 ? 0.65 : max(0.35, 0.65 - (t - 0.3) / 0.25 * 0.3))
+        }
+        #expect(actions == [.nextTrack])
+    }
+
+    @Test func testTwoFingerSwipeDownIsPreviousWithVerticalPrev() {
+        var c = GestureConfig()
+        c.verticalSwipeAlwaysNext = false
+        let e = GestureEngine(config: c)
         let actions = run(e, pose: .twoFingers, seconds: 1.0) { t in
             Vec2(0.66, t < 0.3 ? 0.65 : max(0.35, 0.65 - (t - 0.3) / 0.25 * 0.3))
         }

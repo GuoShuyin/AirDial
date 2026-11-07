@@ -62,11 +62,16 @@ public struct GestureConfig {
     public var swipeReturnLockout: Double = 1.4
     public var enableVerticalSwipe: Bool = true
     public var enableHorizontalSwipe: Bool = true
-    /// true: two fingers up = next track, down = previous track.
+    /// true: two fingers up OR down = next track. Up and down are hard to tell apart on a webcam
+    /// (a swipe often starts with a quick wind-up the other way), so by default both mean "next".
+    public var verticalSwipeAlwaysNext: Bool = true
+    /// When `verticalSwipeAlwaysNext` is false: true = up is next / down is previous.
     public var swipeUpIsNext: Bool = true
 
-    // MARK: Open palm sideways swipe -> switch desktop (Space)
+    // MARK: Open palm swipe: sideways -> switch desktop (Space), up/down -> Mission Control
     public var enablePalmSwipe: Bool = true
+    /// Up or down (either direction) toggles Mission Control: once to show all windows, again to close it.
+    public var enablePalmVerticalSwipe: Bool = true
     /// Minimum sideways travel of the palm centre within `swipeWindow`.
     /// Larger than the two-finger swipe so that circling with an open hand doesn't switch desktops.
     public var palmSwipeMinDistance: Double = 0.25
@@ -78,9 +83,10 @@ public struct GestureConfig {
     public var palmArmedWindow: Double = 1.0
     /// The palm centre must be at least this high in the frame (0 = bottom, 1 = top) to arm:
     /// hands resting near the keyboard sit at the bottom edge.
-    public var palmMinHeight: Double = 0.3
+    public var palmMinHeight: Double = 0.35
     /// A jump larger than this between two frames is a keypoint glitch, not hand motion.
-    public var palmMaxJump: Double = 0.15
+    /// Kept large: a real palm swipe moves up to ~0.3 per frame, more when blurred frames drop out.
+    public var palmMaxJump: Double = 1.0
     /// true: palm moves right = go to the desktop on the left (like dragging the desktops along).
     public var palmRightGoesLeft: Bool = true
 

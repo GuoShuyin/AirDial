@@ -47,7 +47,7 @@ final class OverlayView: NSView {
         switch status.pose {
         case .point: poseText = "☝️ One finger: circle for volume"
         case .twoFingers: poseText = "✌️ Two fingers: swipe for tracks"
-        case .openPalm: poseText = "🖐 Open palm: hold, then swipe sideways for desktops"
+        case .openPalm: poseText = "🖐 Open palm: hold, then swipe (sideways: desktops, up/down: Mission Control)"
         case .other: poseText = "Not a gesture"
         case .none: poseText = "No hand detected"
         }

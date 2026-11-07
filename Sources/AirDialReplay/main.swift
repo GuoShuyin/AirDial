@@ -42,6 +42,12 @@ while i < args.count {
         case "swipeWindow": config.swipeWindow = v
         case "swipeMinDistance": config.swipeMinDistance = v
         case "swipeAxisRatio": config.swipeAxisRatio = v
+        case "palmSwipeMinDistance": config.palmSwipeMinDistance = v
+        case "palmStillSpeed": config.palmStillSpeed = v
+        case "palmArmSeconds": config.palmArmSeconds = v
+        case "palmArmedWindow": config.palmArmedWindow = v
+        case "palmMinHeight": config.palmMinHeight = v
+        case "palmMaxJump": config.palmMaxJump = v
         case "filterMinCutoff": config.filterMinCutoff = v
         case "filterBeta": config.filterBeta = v
         default: print("unknown key \(kv[0])"); exit(2)
@@ -86,7 +92,7 @@ for row in lines.dropFirst() {
         let st = engine.status
         print(String(format: "%.2f raw=%@ pose=%@ cur=%@ deg=%.0f%@ %@", t - t0, st.rawPose.rawValue, st.pose.rawValue,
                      st.cursor.map { String(format: "(%.2f,%.2f)", $0.x, $0.y) } ?? "-", st.circleDegrees,
-                     st.circleEngaged ? " ENG" : "", acts.map { $0.rawValue }.joined(separator: ",")))
+                     st.circleEngaged ? " ENG" : (st.palmArmed ? " ARMED" : ""), acts.map { $0.rawValue }.joined(separator: ",")))
     }
     if timeline {
         let s = Int(t - t0)
@@ -109,5 +115,5 @@ print("raw:    \(fmt(rawCounts))")
 print("active: \(fmt(poseCounts))")
 var counts: [GestureAction: Int] = [:]
 for (_, a) in actions { counts[a, default: 0] += 1 }
-print("actions: " + [GestureAction.volumeUp, .volumeDown, .nextTrack, .previousTrack, .desktopLeft, .desktopRight].map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " "))
+print("actions: " + [GestureAction.volumeUp, .volumeDown, .nextTrack, .previousTrack, .desktopLeft, .desktopRight, .missionControl].map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " "))
 print("action times: " + actions.map { String(format: "%.1f:%@", $0.0, $0.1.rawValue) }.joined(separator: " "))

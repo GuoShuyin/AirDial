@@ -35,12 +35,16 @@ final class MediaController {
         print("[AirDial] \(action.rawValue)\(dryRun ? " (dry run)" : "")")
         guard !dryRun else { return }
 
-        if action == .desktopLeft || action == .desktopRight {
+        if action == .desktopLeft || action == .desktopRight || action == .missionControl {
             guard hasAccessibility else {
-                print("[AirDial] Switching desktops needs Accessibility permission for your terminal app.")
+                print("[AirDial] Desktops and Mission Control need Accessibility permission for your terminal app.")
                 return
             }
-            postSpaceSwitch(left: action == .desktopLeft)
+            switch action {
+            case .desktopLeft: postControlArrow(123)
+            case .desktopRight: postControlArrow(124)
+            default: postControlArrow(126)  // Control+Up toggles Mission Control
+            }
             return
         }
 
@@ -50,7 +54,7 @@ final class MediaController {
             case .volumeDown: postMediaKey(.soundDown)
             case .nextTrack: postMediaKey(.next)
             case .previousTrack: postMediaKey(.previous)
-            case .desktopLeft, .desktopRight: break
+            case .desktopLeft, .desktopRight, .missionControl: break
             }
             return
         }
@@ -64,7 +68,7 @@ final class MediaController {
             tellPlayer("next track")
         case .previousTrack:
             tellPlayer("previous track")
-        case .desktopLeft, .desktopRight:
+        case .desktopLeft, .desktopRight, .missionControl:
             break
         }
     }
@@ -90,9 +94,8 @@ final class MediaController {
         send(down: false)
     }
 
-    /// Control + ←/→: the default Mission Control shortcuts "Move left/right a space".
-    private func postSpaceSwitch(left: Bool) {
-        let key: CGKeyCode = left ? 123 : 124
+    /// Control + ←/→/↑: the default shortcuts "Move left/right a space" and "Mission Control".
+    private func postControlArrow(_ key: CGKeyCode) {
         let src = CGEventSource(stateID: .hidSystemState)
         // Real arrow-key presses carry the fn and numeric-pad flags; the shortcut matches those.
         let flags: CGEventFlags = [.maskControl, .maskSecondaryFn, .maskNumericPad]

@@ -18,8 +18,8 @@ struct Options {
     AirDial — mid-air gestures for music on macOS (uses the built-in webcam)
 
       ☝️  Index finger, draw a circle   clockwise = volume up, counter-clockwise = volume down
-      ✌️  Two fingers (V), swipe        up / right = next track, down / left = previous track
-      🖐  Open palm, swipe sideways      right = desktop on the left, left = desktop on the right
+      ✌️  Two fingers (V), swipe        up or down = next track (right / left = next / previous)
+      🖐  Open palm, hold, then swipe   sideways = switch desktop, up or down = Mission Control on/off
 
     Usage: AirDial [options]
       --headless          No preview window (runs in the background, Ctrl+C to quit)
@@ -29,10 +29,12 @@ struct Options {
       --camera NAME       Use the camera whose name contains NAME
       --list-cameras      List cameras and exit
       --ccw-up            Counter-clockwise = volume up (reverse the knob)
-      --swipe-down-next   Two fingers down = next track (reverse vertical swipe)
+      --vertical-prev     Two fingers up = next, down = previous (default: both = next)
+      --swipe-down-next   With --vertical-prev: down = next, up = previous
       --no-horizontal     Disable left/right swipes
       --no-vertical       Disable up/down swipes
-      --no-desktops       Disable open-palm desktop switching
+      --no-desktops       Disable open-palm swipes (desktops and Mission Control)
+      --no-mission-control  Disable open-palm up/down = Mission Control
       --palm-follows      Palm right = desktop on the right (default: palm right = desktop on the left)
       --sensitivity X     0.5 (strict) ... 1.5 (sensitive), default 1.0
       -h, --help          Show this help
@@ -55,10 +57,12 @@ struct Options {
                 i += 1
                 if i < args.count { o.cameraName = args[i] }
             case "--ccw-up": o.config.clockwiseIsVolumeUp = false
+            case "--vertical-prev": o.config.verticalSwipeAlwaysNext = false
             case "--swipe-down-next": o.config.swipeUpIsNext = false
             case "--no-horizontal": o.config.enableHorizontalSwipe = false
             case "--no-vertical": o.config.enableVerticalSwipe = false
             case "--no-desktops": o.config.enablePalmSwipe = false
+            case "--no-mission-control": o.config.enablePalmVerticalSwipe = false
             case "--palm-follows": o.config.palmRightGoesLeft = false
             case "--sensitivity":
                 i += 1
@@ -236,6 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .previousTrack: return "⏮ Previous track"
         case .desktopLeft: return "⬅️ Desktop on the left"
         case .desktopRight: return "➡️ Desktop on the right"
+        case .missionControl: return "🪟 Mission Control"
         }
     }
 

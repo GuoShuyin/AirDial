@@ -3,6 +3,7 @@ import Foundation
 public enum GestureAction: String {
     case volumeUp, volumeDown, nextTrack, previousTrack
     case desktopLeft, desktopRight
+    case missionControl
 }
 
 /// What the engine is doing right now (for the on-screen overlay).
@@ -109,14 +110,21 @@ public final class GestureEngine {
             lastPalm = (p, time)
             status.palmArmed = time <= palmArmedUntil
             var pc = config
-            pc.enableVerticalSwipe = false
+            pc.enableVerticalSwipe = config.enablePalmVerticalSwipe
             pc.enableHorizontalSwipe = true
             pc.swipeMinDistance = config.palmSwipeMinDistance
-            if let dir = palmSwipe.add(p, time: time, config: pc), time >= palmBlockedUntil, time <= palmArmedUntil {
+            let armed = time <= palmArmedUntil && time >= palmBlockedUntil
+            if !armed { palmSwipe.observe(p, time: time, config: pc) }
+            if armed, let dir = palmSwipe.add(p, time: time, config: pc) {
                 palmArmedUntil = -.infinity
                 palmStillSince = nil
-                let goLeft = (dir == .right) == config.palmRightGoesLeft
-                actions.append(goLeft ? .desktopLeft : .desktopRight)
+                switch dir {
+                case .up, .down:
+                    actions.append(.missionControl)
+                case .left, .right:
+                    let goLeft = (dir == .right) == config.palmRightGoesLeft
+                    actions.append(goLeft ? .desktopLeft : .desktopRight)
+                }
                 circleBlockedUntil = time + config.crossGestureLockout
                 swipeBlockedUntil = time + config.crossGestureLockout
             }
@@ -131,8 +139,8 @@ public final class GestureEngine {
 
     private func action(for dir: SwipeDirection) -> GestureAction? {
         switch dir {
-        case .up: return config.swipeUpIsNext ? .nextTrack : .previousTrack
-        case .down: return config.swipeUpIsNext ? .previousTrack : .nextTrack
+        case .up: return config.verticalSwipeAlwaysNext || config.swipeUpIsNext ? .nextTrack : .previousTrack
+        case .down: return config.verticalSwipeAlwaysNext || !config.swipeUpIsNext ? .nextTrack : .previousTrack
         case .right: return .nextTrack
         case .left: return .previousTrack
         }

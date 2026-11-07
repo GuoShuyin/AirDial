@@ -30,11 +30,17 @@ public struct SwipeDetector {
         lastSwipe = nil
     }
 
-    public mutating func add(_ p: Vec2, time t: Double, config c: GestureConfig) -> SwipeDirection? {
+    /// Record a position without detecting anything (e.g. while a gesture isn't armed yet),
+    /// so a motion that doesn't count also can't start a cooldown or return lockout.
+    public mutating func observe(_ p: Vec2, time t: Double, config c: GestureConfig) {
         history.append((t, p))
         while let first = history.first, t - first.t > c.swipeWindow {
             history.removeFirst()
         }
+    }
+
+    public mutating func add(_ p: Vec2, time t: Double, config c: GestureConfig) -> SwipeDirection? {
+        observe(p, time: t, config: c)
         guard t >= cooldownUntil, history.count >= 3 else { return nil }
 
         // Compare against every older sample in the window (not just the oldest),

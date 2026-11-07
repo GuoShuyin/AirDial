@@ -23,16 +23,18 @@ final class CalibrationController {
     private let chime = NSSound(named: "Tink")
     private let onDone: (PointerCalibration?) -> Void
 
-    /// Hold the fingertip within this distance (camera units) for `holdTime` to record a target.
-    /// The ring only starts once the finger has settled; any movement resets it.
-    var holdRadius = 0.008
+    /// Hold the fingertip within this distance (camera units) for `holdTime` to record a target;
+    /// the recorded position is the average over the hold. 0.008 was tighter than the natural
+    /// jitter of a pointing finger, so dots got skipped while held perfectly still.
+    var holdRadius = 0.02
     var holdTime = 0.8
-    /// After a dot appears, this long is for moving your finger there; nothing is recorded.
-    var moveGrace = 1.0
+    /// After a dot appears, this long is for seeing it and moving your finger there; nothing is
+    /// recorded meanwhile. (A new dot also plays "Pop" and gets a yellow frame.)
+    var moveGrace = 1.5
     private var dotShownAt: Double?
-    /// The finger must first move this far (camera units) after a dot appears: otherwise a finger
-    /// still resting from the previous step gets recorded before you even saw the new dot.
-    var mustMove = 0.04
+    /// Optionally require the finger to move this far after a dot appears (0 = off: people often
+    /// point at the next dot before it appears, and then it would never be recorded).
+    var mustMove = 0.0
     private var anchor: Vec2?
     private var moved = false
     private let newDotSound = NSSound(named: "Pop")
@@ -166,7 +168,7 @@ final class CalibrationController {
             return
         }
         guard let tip = tip else { steady.removeAll(); views.forEach { $0.progress = 0; $0.needsDisplay = true }; return }
-        if !moved {
+        if !moved, mustMove > 0 {
             if anchor == nil { anchor = tip }
             if let a = anchor, tip.distance(to: a) >= mustMove { moved = true } else { return }
         }

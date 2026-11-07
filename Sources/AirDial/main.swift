@@ -264,6 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let cal = calibration, cal.isActive {
             // Calibrating: only collect fingertip positions; no cursor moves or actions.
             cal.update(tip: engine.status.pointerTip, handVisible: engine.status.rawPose != .none, aspect: aspect, time: time)
+            writeLog(sample, time: time, info: info, actions: actions, note: "calibrating")
             preview?.overlay.status = engine.status
             preview?.overlay.needsDisplay = true
             return
@@ -280,31 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let status = engine.status
-        if let log = log {
-            func f(_ v: Double?) -> String { v.map { String(format: "%.4f", $0) } ?? "" }
-            let j = ["wrist", "indexTip", "indexPIP", "middleTip", "middlePIP", "ringTip", "littleTip"]
-                .map { String(format: "%.2f", info.jointConf[$0] ?? 0) }
-            let tip = sample?.tip(.index)
-            var cols: [String] = [String(format: "%.4f", time), String(format: "%.1f", info.visionMs), "\(info.droppedBefore)",
-                                  String(format: "%.2f", info.handConfidence)]
-            cols += j
-            cols += [status.rawPose.rawValue, status.pose.rawValue, f(tip?.x), f(tip?.y), f(status.cursor?.x), f(status.cursor?.y)]
-            cols += [String(format: "%.0f", status.circleDegrees), status.circleEngaged ? "1" : "0",
-                     actions.map { $0.rawValue }.joined(separator: "|")]
-            if info.rawJoints.isEmpty {
-                cols += Array(repeating: "", count: HandTracker.logJoints.count * 3)
-            } else {
-                for p in info.rawJoints {
-                    cols += [String(format: "%.4f", p.x), String(format: "%.4f", p.y), String(format: "%.2f", p.c)]
-                }
-            }
-            if info.world.count == 21 {
-                for p in info.world { cols += [String(format: "%.4f", p.x), String(format: "%.4f", p.y), String(format: "%.4f", p.z)] }
-            } else {
-                cols += Array(repeating: "", count: 21 * 3)
-            }
-            log.write((cols.joined(separator: ",") + "\n").data(using: .utf8)!)
-        }
+        writeLog(sample, time: time, info: info, actions: actions)
         if options.debug, status.rawPose != lastDebugPose {
             print("[pose] raw=\(status.rawPose.rawValue) active=\(status.pose.rawValue)")
             lastDebugPose = status.rawPose
@@ -324,6 +301,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             overlay.lastAction = (label(for: a), Date())
         }
         overlay.needsDisplay = true
+    }
+
+    private func writeLog(_ sample: HandSample?, time: Double, info: FrameInfo, actions: [GestureAction], note: String = "") {
+        guard let log = log else { return }
+        let status = engine.status
+        do {
+            func f(_ v: Double?) -> String { v.map { String(format: "%.4f", $0) } ?? "" }
+            let j = ["wrist", "indexTip", "indexPIP", "middleTip", "middlePIP", "ringTip", "littleTip"]
+                .map { String(format: "%.2f", info.jointConf[$0] ?? 0) }
+            let tip = sample?.tip(.index)
+            var cols: [String] = [String(format: "%.4f", time), String(format: "%.1f", info.visionMs), "\(info.droppedBefore)",
+                                  String(format: "%.2f", info.handConfidence)]
+            cols += j
+            cols += [status.rawPose.rawValue, status.pose.rawValue, f(tip?.x), f(tip?.y), f(status.cursor?.x), f(status.cursor?.y)]
+            cols += [String(format: "%.0f", status.circleDegrees), status.circleEngaged ? "1" : "0",
+                     (actions.map { $0.rawValue } + (note.isEmpty ? [] : [note])).joined(separator: "|")]
+            if info.rawJoints.isEmpty {
+                cols += Array(repeating: "", count: HandTracker.logJoints.count * 3)
+            } else {
+                for p in info.rawJoints {
+                    cols += [String(format: "%.4f", p.x), String(format: "%.4f", p.y), String(format: "%.2f", p.c)]
+                }
+            }
+            if info.world.count == 21 {
+                for p in info.world { cols += [String(format: "%.4f", p.x), String(format: "%.4f", p.y), String(format: "%.4f", p.z)] }
+            } else {
+                cols += Array(repeating: "", count: 21 * 3)
+            }
+            log.write((cols.joined(separator: ",") + "\n").data(using: .utf8)!)
+        }
     }
 
     private func label(for a: GestureAction) -> String {

@@ -64,7 +64,8 @@ struct GestureEngineTests {
         let c = GestureConfig()
         #expect(PoseClassifier.classify(hand(pose: .point, tipAt: Vec2(0.5, 0.5), time: 0), config: c) == .point)
         #expect(PoseClassifier.classify(hand(pose: .twoFingers, tipAt: Vec2(0.5, 0.5), time: 0), config: c) == .twoFingers)
-        #expect(PoseClassifier.classify(hand(pose: .other, tipAt: Vec2(0.5, 0.5), time: 0), config: c) == .other)
+        // The helper's default hand has all four fingers extended: an open palm.
+        #expect(PoseClassifier.classify(hand(pose: .other, tipAt: Vec2(0.5, 0.5), time: 0), config: c) == .openPalm)
         #expect(PoseClassifier.classify(nil, config: c) == .none)
     }
 
@@ -132,6 +133,29 @@ struct GestureEngineTests {
     @Test func testCircleWithOpenPalmDoesNothing() {
         let e = GestureEngine()
         let actions = run(e, pose: .other, seconds: 2.0, path: circle(radius: 0.1, period: 1.0, clockwise: true))
+        #expect(actions == [])
+    }
+
+    @Test func testOpenPalmSwipeSwitchesDesktop() {
+        // Raise the palm, hold it still for a moment, then swipe.
+        // Palm moves right -> desktop on the left (default), and vice versa.
+        let e = GestureEngine()
+        let right = run(e, pose: .other, seconds: 1.3) { t in
+            Vec2(t < 0.6 ? 0.4 : min(0.8, 0.4 + (t - 0.6) / 0.25 * 0.4), 0.5)
+        }
+        #expect(right == [.desktopLeft])
+
+        let e2 = GestureEngine()
+        let left = run(e2, pose: .other, seconds: 1.3) { t in
+            Vec2(t < 0.6 ? 0.9 : max(0.5, 0.9 - (t - 0.6) / 0.25 * 0.4), 0.5)
+        }
+        #expect(left == [.desktopRight])
+    }
+
+    @Test func testOpenHandPassingThroughDoesNotSwitchDesktop() {
+        // An open hand moving across the frame without pausing first (e.g. reaching for the mouse).
+        let e = GestureEngine()
+        let actions = run(e, pose: .other, seconds: 2.0) { t in Vec2(0.2 + 0.7 * t, 0.5 + 0.05 * sin(3 * t)) }
         #expect(actions == [])
     }
 

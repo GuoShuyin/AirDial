@@ -19,6 +19,7 @@ struct Options {
 
       ☝️  Index finger, draw a circle   clockwise = volume up, counter-clockwise = volume down
       ✌️  Two fingers (V), swipe        up / right = next track, down / left = previous track
+      🖐  Open palm, swipe sideways      right = desktop on the left, left = desktop on the right
 
     Usage: AirDial [options]
       --headless          No preview window (runs in the background, Ctrl+C to quit)
@@ -31,6 +32,8 @@ struct Options {
       --swipe-down-next   Two fingers down = next track (reverse vertical swipe)
       --no-horizontal     Disable left/right swipes
       --no-vertical       Disable up/down swipes
+      --no-desktops       Disable open-palm desktop switching
+      --palm-follows      Palm right = desktop on the right (default: palm right = desktop on the left)
       --sensitivity X     0.5 (strict) ... 1.5 (sensitive), default 1.0
       -h, --help          Show this help
     """
@@ -55,6 +58,8 @@ struct Options {
             case "--swipe-down-next": o.config.swipeUpIsNext = false
             case "--no-horizontal": o.config.enableHorizontalSwipe = false
             case "--no-vertical": o.config.enableVerticalSwipe = false
+            case "--no-desktops": o.config.enablePalmSwipe = false
+            case "--palm-follows": o.config.palmRightGoesLeft = false
             case "--sensitivity":
                 i += 1
                 if i < args.count, let s = Double(args[i]), s > 0 {
@@ -229,6 +234,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .volumeDown: return "🔉 音量 −"
         case .nextTrack: return "⏭ 下一首"
         case .previousTrack: return "⏮ 上一首"
+        case .desktopLeft: return "⬅️ 左边桌面"
+        case .desktopRight: return "➡️ 右边桌面"
         }
     }
 

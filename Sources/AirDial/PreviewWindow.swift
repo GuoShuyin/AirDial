@@ -47,7 +47,8 @@ final class OverlayView: NSView {
         switch status.pose {
         case .point: poseText = "☝️ 单指：转圈调音量"
         case .twoFingers: poseText = "✌️ 双指：上下/左右滑切歌"
-        case .other: poseText = "✋ 未识别为手势"
+        case .openPalm: poseText = "🖐 手掌：左右挥切换桌面"
+        case .other: poseText = "未识别为手势"
         case .none: poseText = "没有检测到手"
         }
         var lines = [poseText]

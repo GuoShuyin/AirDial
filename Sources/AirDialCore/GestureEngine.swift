@@ -2,6 +2,7 @@ import Foundation
 
 public enum GestureAction: String {
     case volumeUp, volumeDown, nextTrack, previousTrack
+    case desktopLeft, desktopRight
 }
 
 /// What the engine is doing right now (for the on-screen overlay).
@@ -11,6 +12,7 @@ public struct GestureStatus {
     public var cursor: Vec2?          // smoothed point being tracked
     public var circleDegrees: Double = 0
     public var circleEngaged = false
+    public var palmArmed = false
 
     public init() {}
 }
@@ -29,12 +31,20 @@ public final class GestureEngine {
     private var filter: OneEuroFilter2D
     private var circle = CircleTracker()
     private var swipe = SwipeDetector()
+    private var palmSwipe = SwipeDetector()
+    private var palmFilter: OneEuroFilter2D
+    private var palmBlockedUntil: Double = -.infinity
+    private var lastPalm: (p: Vec2, t: Double)?
+    private var lastPalmRaw: Vec2?
+    private var palmStillSince: Double?
+    private var palmArmedUntil: Double = -.infinity
     private var circleBlockedUntil: Double = -.infinity
     private var swipeBlockedUntil: Double = -.infinity
 
     public init(config: GestureConfig = GestureConfig()) {
         self.config = config
         filter = OneEuroFilter2D(minCutoff: config.filterMinCutoff, beta: config.filterBeta)
+        palmFilter = OneEuroFilter2D(minCutoff: config.filterMinCutoff, beta: config.filterBeta)
     }
 
     /// Feed one camera frame. `sample` is nil when no hand was detected.
@@ -58,6 +68,7 @@ public final class GestureEngine {
                 let up = clockwise == config.clockwiseIsVolumeUp
                 actions.append(up ? .volumeUp : .volumeDown)
                 swipeBlockedUntil = time + config.crossGestureLockout
+                palmBlockedUntil = time + config.crossGestureLockout
             }
         case .twoFingers:
             guard let s = sample, let a = s.tip(.index), let b = s.tip(.middle) else { break }
@@ -67,7 +78,47 @@ public final class GestureEngine {
                 if let action = action(for: dir) {
                     actions.append(action)
                     circleBlockedUntil = time + config.crossGestureLockout
+                    palmBlockedUntil = time + config.crossGestureLockout
                 }
+            }
+        case .openPalm:
+            guard config.enablePalmSwipe, let s = sample, let c = s.palmCenter else { break }
+            let p = palmFilter.filter(c, time: time)
+            status.cursor = p
+            defer { lastPalmRaw = c }
+            if let prevRaw = lastPalmRaw, c.distance(to: prevRaw) > config.palmMaxJump {
+                // Keypoint glitch: drop the motion so far instead of treating the jump as a swipe.
+                palmFilter.reset()
+                palmSwipe.resetMotion()
+                palmStillSince = nil
+                palmArmedUntil = -.infinity
+                lastPalm = nil
+                status.cursor = c
+                break
+            }
+            if let last = lastPalm, time > last.t {
+                let speed = p.distance(to: last.p) / (time - last.t)
+                if speed < config.palmStillSpeed, p.y >= config.palmMinHeight {
+                    let since = palmStillSince ?? time
+                    palmStillSince = since
+                    if time - since >= config.palmArmSeconds { palmArmedUntil = time + config.palmArmedWindow }
+                } else {
+                    palmStillSince = nil
+                }
+            }
+            lastPalm = (p, time)
+            status.palmArmed = time <= palmArmedUntil
+            var pc = config
+            pc.enableVerticalSwipe = false
+            pc.enableHorizontalSwipe = true
+            pc.swipeMinDistance = config.palmSwipeMinDistance
+            if let dir = palmSwipe.add(p, time: time, config: pc), time >= palmBlockedUntil, time <= palmArmedUntil {
+                palmArmedUntil = -.infinity
+                palmStillSince = nil
+                let goLeft = (dir == .right) == config.palmRightGoesLeft
+                actions.append(goLeft ? .desktopLeft : .desktopRight)
+                circleBlockedUntil = time + config.crossGestureLockout
+                swipeBlockedUntil = time + config.crossGestureLockout
             }
         case .none, .other:
             status.cursor = nil
@@ -101,10 +152,11 @@ public final class GestureEngine {
             candidateCount = 1
         }
 
-        let isGesturePose = raw == .point || raw == .twoFingers
+        let isGesturePose = raw == .point || raw == .twoFingers || raw == .openPalm
         let switchNow: Bool
         if isGesturePose {
-            switchNow = candidateCount >= config.poseConfirmFrames
+            let fromGesture = activePose == .point || activePose == .twoFingers || activePose == .openPalm
+            switchNow = candidateCount >= (fromGesture ? config.poseSwitchFrames : config.poseConfirmFrames)
         } else {
             // Leaving a gesture pose is slower: tolerate a few misread frames mid-gesture.
             switchNow = time - lastActiveSeen > config.poseDropSeconds
@@ -115,7 +167,13 @@ public final class GestureEngine {
             candidateCount = 0
             circle.reset()
             swipe.resetMotion()
+            palmSwipe.resetMotion()
             filter.reset()
+            palmFilter.reset()
+            lastPalm = nil
+            lastPalmRaw = nil
+            palmStillSince = nil
+            palmArmedUntil = -.infinity
         }
     }
 }

@@ -35,12 +35,22 @@ final class MediaController {
         print("[AirDial] \(action.rawValue)\(dryRun ? " (dry run)" : "")")
         guard !dryRun else { return }
 
+        if action == .desktopLeft || action == .desktopRight {
+            guard hasAccessibility else {
+                print("[AirDial] Switching desktops needs Accessibility permission for your terminal app.")
+                return
+            }
+            postSpaceSwitch(left: action == .desktopLeft)
+            return
+        }
+
         if hasAccessibility {
             switch action {
             case .volumeUp: postMediaKey(.soundUp)
             case .volumeDown: postMediaKey(.soundDown)
             case .nextTrack: postMediaKey(.next)
             case .previousTrack: postMediaKey(.previous)
+            case .desktopLeft, .desktopRight: break
             }
             return
         }
@@ -54,6 +64,8 @@ final class MediaController {
             tellPlayer("next track")
         case .previousTrack:
             tellPlayer("previous track")
+        case .desktopLeft, .desktopRight:
+            break
         }
     }
 
@@ -76,6 +88,19 @@ final class MediaController {
         }
         send(down: true)
         send(down: false)
+    }
+
+    /// Control + ←/→: the default Mission Control shortcuts "Move left/right a space".
+    private func postSpaceSwitch(left: Bool) {
+        let key: CGKeyCode = left ? 123 : 124
+        let src = CGEventSource(stateID: .hidSystemState)
+        // Real arrow-key presses carry the fn and numeric-pad flags; the shortcut matches those.
+        let flags: CGEventFlags = [.maskControl, .maskSecondaryFn, .maskNumericPad]
+        for down in [true, false] {
+            let e = CGEvent(keyboardEventSource: src, virtualKey: key, keyDown: down)
+            e?.flags = flags
+            e?.post(tap: .cghidEventTap)
+        }
     }
 
     private func tellPlayer(_ command: String) {

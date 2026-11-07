@@ -10,6 +10,9 @@ public struct GestureConfig {
     public var curledRatio: Double = 0.98
     /// Frames a new pose must be seen in a row before it becomes active.
     public var poseConfirmFrames: Int = 3
+    /// Same, when switching straight from one gesture pose to another. Longer, because the
+    /// model briefly misreads a pointing finger as an open hand (~12% of frames on a webcam).
+    public var poseSwitchFrames: Int = 10
     /// Seconds without seeing the active pose (no hand / other pose) before it is dropped.
     /// Time-based, not frame-based: the model misreads the finger for several frames in a row
     /// whenever it turns towards the camera mid-circle, and that must not reset the circle.
@@ -61,6 +64,25 @@ public struct GestureConfig {
     public var enableHorizontalSwipe: Bool = true
     /// true: two fingers up = next track, down = previous track.
     public var swipeUpIsNext: Bool = true
+
+    // MARK: Open palm sideways swipe -> switch desktop (Space)
+    public var enablePalmSwipe: Bool = true
+    /// Minimum sideways travel of the palm centre within `swipeWindow`.
+    /// Larger than the two-finger swipe so that circling with an open hand doesn't switch desktops.
+    public var palmSwipeMinDistance: Double = 0.25
+    /// The palm must be held still (slower than `palmStillSpeed`, image heights / s) for
+    /// `palmArmSeconds` before a swipe counts, and the swipe must start within `palmArmedWindow`.
+    /// An open hand passing through the frame (reaching for the mouse...) never pauses.
+    public var palmStillSpeed: Double = 0.35
+    public var palmArmSeconds: Double = 0.25
+    public var palmArmedWindow: Double = 1.0
+    /// The palm centre must be at least this high in the frame (0 = bottom, 1 = top) to arm:
+    /// hands resting near the keyboard sit at the bottom edge.
+    public var palmMinHeight: Double = 0.3
+    /// A jump larger than this between two frames is a keypoint glitch, not hand motion.
+    public var palmMaxJump: Double = 0.15
+    /// true: palm moves right = go to the desktop on the left (like dragging the desktops along).
+    public var palmRightGoesLeft: Bool = true
 
     // MARK: Cross-gesture
     /// After any action, the *other* gesture is blocked for this long.

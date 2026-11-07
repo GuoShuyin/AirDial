@@ -36,6 +36,7 @@ public enum HandPose: String {
     case none        // no hand
     case point       // only index finger extended  -> circle = volume
     case twoFingers  // index + middle extended     -> swipe = track
+    case openPalm    // index + middle + ring extended -> sideways swipe = switch desktop
     case other       // open palm, fist, etc.
 }
 
@@ -76,6 +77,9 @@ public enum PoseClassifier {
         let ringFolded = ring != .extended
         let littleFolded = little != .extended
 
+        if index == .extended, middle == .extended, ring == .extended, little != .curled {
+            return .openPalm
+        }
         if index == .extended, middle == .extended, ringFolded, littleFolded, ring == .curled || little == .curled {
             return .twoFingers
         }
@@ -83,5 +87,15 @@ public enum PoseClassifier {
             return .point
         }
         return .other
+    }
+}
+
+extension HandSample {
+    /// Centre of the palm: mean of the finger MCP joints (the wrist is often out of frame).
+    public var palmCenter: Vec2? {
+        let mcps = Finger.allCases.compactMap { fingers[$0]?.mcp }
+        guard !mcps.isEmpty else { return wrist }
+        let n = Double(mcps.count)
+        return Vec2(mcps.reduce(0) { $0 + $1.x } / n, mcps.reduce(0) { $0 + $1.y } / n)
     }
 }

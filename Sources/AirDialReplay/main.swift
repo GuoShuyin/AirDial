@@ -95,7 +95,7 @@ for row in lines.dropFirst() {
             lastSec = s
             secRaw = ""
         }
-        let ch: Character = ["none": ".", "point": "1", "twoFingers": "2", "other": "o"][engine.status.pose.rawValue]!
+        let ch: Character = ["none": ".", "point": "1", "twoFingers": "2", "openPalm": "5", "other": "o"][engine.status.pose.rawValue]!
         secRaw.append(ch)
         for a in acts { secRaw += "[\(a.rawValue)]" }
     }
@@ -103,11 +103,11 @@ for row in lines.dropFirst() {
 if timeline, lastSec >= 0 { print(String(format: "%3d s  %@", lastSec, secRaw)) }
 
 func fmt(_ c: [HandPose: Int]) -> String {
-    [HandPose.none, .point, .twoFingers, .other].map { "\($0.rawValue)=\(c[$0, default: 0])" }.joined(separator: " ")
+    [HandPose.none, .point, .twoFingers, .openPalm, .other].map { "\($0.rawValue)=\(c[$0, default: 0])" }.joined(separator: " ")
 }
 print("raw:    \(fmt(rawCounts))")
 print("active: \(fmt(poseCounts))")
 var counts: [GestureAction: Int] = [:]
 for (_, a) in actions { counts[a, default: 0] += 1 }
-print("actions: " + [GestureAction.volumeUp, .volumeDown, .nextTrack, .previousTrack].map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " "))
+print("actions: " + [GestureAction.volumeUp, .volumeDown, .nextTrack, .previousTrack, .desktopLeft, .desktopRight].map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " "))
 print("action times: " + actions.map { String(format: "%.1f:%@", $0.0, $0.1.rawValue) }.joined(separator: " "))

@@ -230,12 +230,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func label(for a: GestureAction) -> String {
         switch a {
-        case .volumeUp: return "🔊 音量 +"
-        case .volumeDown: return "🔉 音量 −"
-        case .nextTrack: return "⏭ 下一首"
-        case .previousTrack: return "⏮ 上一首"
-        case .desktopLeft: return "⬅️ 左边桌面"
-        case .desktopRight: return "➡️ 右边桌面"
+        case .volumeUp: return "🔊 Volume +"
+        case .volumeDown: return "🔉 Volume −"
+        case .nextTrack: return "⏭ Next track"
+        case .previousTrack: return "⏮ Previous track"
+        case .desktopLeft: return "⬅️ Desktop on the left"
+        case .desktopRight: return "➡️ Desktop on the right"
         }
     }
 

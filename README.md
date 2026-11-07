@@ -1,91 +1,119 @@
+<p align="right"><b>English</b> · <a href="README.zh-CN.md">中文</a></p>
+
 # AirDial
 
-用 MacBook 自带摄像头做 BMW 风格的隔空手势控制音乐。不需要深度摄像头，也不需要训练模型。
+Mid-air, BMW-style gestures for music on macOS, using the regular built-in webcam. No depth camera, no model training.
 
-Mid-air, BMW-style gestures for music on macOS using the regular built-in webcam.
-
-| 手势 | 动作 |
+| Gesture | Action |
 | --- | --- |
-| ☝️ 只伸食指，在空中**顺时针**画圈 | 音量 + （一直转就一直加，像旋钮） |
-| ☝️ 只伸食指，**逆时针**画圈 | 音量 − |
-| ✌️ 伸食指+中指（V 字），**向上**快速一划 | 下一首 |
-| ✌️ V 字**向下**快速一划 | 上一首 |
-| ✌️ V 字向右 / 向左一划 | 下一首 / 上一首 |
+| ☝️ Index finger only, draw a circle **clockwise** | Volume + (one step per loop, like turning a knob) |
+| ☝️ Index finger only, draw a circle **counter-clockwise** | Volume − |
+| ✌️ Index + middle finger (V), quick swipe **up** | Next track |
+| ✌️ V, quick swipe **down** | Previous track |
+| ✌️ V, swipe right / left | Next / previous track |
+| 🖐 Open palm, **hold still for a moment**, then swipe **right** | Desktop (Space) on the left |
+| 🖐 Open palm, hold still, then swipe **left** | Desktop (Space) on the right |
 
-## 原理（为什么不需要训练）
+## How it works (and why no training is needed)
 
-1. **手部关键点**：用 Apple Vision 自带的 `VNDetectHumanHandPoseRequest`。这是苹果预训练好的模型，每帧给出 21 个手部关节点，在 Apple Silicon 上 640×480 能跑 30fps，用的是神经网络引擎，不吃 GPU。
-2. **手型判断**：比较每根手指"指尖到手腕"和"PIP 关节到手腕"的距离比例，判断哪根手指伸直，从而区分 ☝️ 单指 / ✌️ 双指 / 其他。用比例而不是绝对距离，所以手离摄像头远近都可以。
-3. **画圈识别**：不拟合圆，而是累加指尖运动方向的转角。转一圈就是 ±360°，直线和来回晃动加起来接近 0。启动时还要求：转了 270° 以上、85% 以上的转动都是同一方向、圈够大、不扁、足够圆。之后每多转一圈（360°）就再调一格音量，所以转几圈就调几格。
-4. **滑动识别**：两指中点在 0.45 秒内移动超过画面高度的 16%，且主方向位移是另一方向的 1.8 倍以上。
-5. **防误触**：One Euro 滤波去抖；手型需要连续 3 帧才生效、丢失 6 帧才退出；滑动后有 0.8 秒冷却；把手收回来的反向动作在 1.4 秒内会被忽略；两种手势之间互相锁 0.6 秒。
+1. **Hand keypoints**: Apple Vision's built-in `VNDetectHumanHandPoseRequest`, a pretrained model that returns 21 hand joints per frame. It takes about 7 ms per frame on Apple Silicon. The camera is pinned to 30 fps: in dim light the webcam would otherwise drop to ~15 fps with long exposures that smear a moving hand.
+2. **Hand shape**: for each finger, compare the tip-to-wrist distance with the PIP-to-wrist distance to decide whether it is extended. This separates ☝️ one finger / ✌️ two fingers / 🖐 open palm / anything else. Ratios rather than absolute distances, so it works at any distance from the camera.
+3. **Circles**: no circle fitting. AirDial adds up how much the direction of the fingertip's motion turns. One loop is ±360°; straight lines and back-and-forth motion add up to about 0. To start, the path must turn 270° or more, at least 85% of it in one direction, and be big enough, not flat and round enough. After that, every further full loop (360°) is one more volume step, so N loops give N steps. Turning back 120° from the furthest point reached stops the knob.
+4. **Swipes**: the midpoint of the two fingertips moves more than 16% of the frame height within 0.45 s, with the main-axis travel at least 1.8× the cross-axis travel.
+5. **Desktop swipes**: the palm centre must first be held still for 0.25 s, above the bottom 30% of the frame, and then travel 25% of the frame height sideways within 1 s. A hand passing through the frame (reaching for the mouse) never pauses, so it doesn't switch desktops.
+6. **False-trigger protection**: One Euro filtering against jitter; a hand shape must be seen for 3 frames to start (10 frames to switch directly between two gestures). It is only dropped after 0.5 s without it, because the model misreads a finger for several frames in a row whenever it turns towards the camera. Swipes have a 0.8 s cooldown, and the reverse motion of bringing your hand back is ignored for 1.4 s. The gestures lock each other out for 0.6 s after any action.
 
-效果好坏主要取决于这些阈值，全部集中在 [`Sources/AirDialCore/GestureConfig.swift`](Sources/AirDialCore/GestureConfig.swift)，也可以用 `--sensitivity` 整体调。
+All thresholds live in [`Sources/AirDialCore/GestureConfig.swift`](Sources/AirDialCore/GestureConfig.swift); `--sensitivity` scales the main ones.
 
-## 安装和运行
+## Install and run
 
-需要 macOS 12+，以及 Xcode 或 Command Line Tools（`xcode-select --install`）。
+Requires macOS 12+ and Xcode or the Command Line Tools (`xcode-select --install`).
 
 ```bash
-git clone <this repo> AirDial
+git clone https://github.com/GuoShuyin/AirDial.git
 cd AirDial
-swift build -c release          # 编译
-swift test                      # 跑手势识别的单元测试（可选）
-.build/release/AirDial          # 运行，会弹出摄像头预览窗口
+swift build -c release          # build
+swift test                      # unit tests for the gesture logic (optional)
+.build/release/AirDial          # run; opens a camera preview window
 ```
 
-只装了 Command Line Tools、没装 Xcode 时，`swift test` 找不到测试框架，改用：
+With only the Command Line Tools (no Xcode), `swift test` cannot find a test framework. Use this instead:
 
 ```bash
 F=/Library/Developer/CommandLineTools/Library/Developer/Frameworks
 swift test --disable-xctest --enable-swift-testing -Xswiftc -F -Xswiftc $F -Xlinker -F -Xlinker $F -Xlinker -rpath -Xlinker $F
 ```
 
-第一次运行会请求两个权限，都是给**你启动它的那个 App**（Terminal / iTerm / VS Code）：
+On first run macOS asks for permissions. They are granted to **the app you launched AirDial from** (Terminal / iTerm / VS Code):
 
-1. **摄像头**：弹窗点允许。如果之前拒绝过：系统设置 → 隐私与安全性 → 摄像头 → 打开 Terminal，然后**完全退出并重开 Terminal**。
-2. **辅助功能**（推荐）：系统设置 → 隐私与安全性 → 辅助功能 → 打开 Terminal，然后重开 Terminal。
-   有了它，AirDial 会模拟键盘上的媒体键，对任何播放器都有效（Apple Music、Spotify、网页里的 YouTube / 网易云等），音量会显示系统的音量浮窗。
-   没有这个权限时会自动退回 AppleScript：只能调系统音量，切歌只支持 Music 和 Spotify（第一次会弹"自动化"权限，点允许）。
+1. **Camera**: click Allow. If you denied it before: System Settings → Privacy & Security → Camera → enable your terminal app, then **quit and reopen** it.
+2. **Accessibility** (recommended, required for desktop switching): System Settings → Privacy & Security → Accessibility → enable your terminal app, then reopen it.
+   With it, AirDial sends the keyboard's media keys, which work with any player (Apple Music, Spotify, YouTube in a browser...) and show the system volume HUD.
+   Without it, AirDial falls back to AppleScript: system volume only, and track switching only for Music and Spotify (macOS asks for "Automation" permission the first time).
 
-### 常用参数
+Desktop switching sends Control+← / Control+→. These are macOS's default "Move left/right a space" shortcuts (System Settings → Keyboard → Keyboard Shortcuts → Mission Control), and you need at least two desktops.
+
+### Options
 
 ```bash
-.build/release/AirDial --dry-run        # 只识别不执行，先练手势
-.build/release/AirDial --headless       # 不要预览窗口，后台运行（Ctrl+C 退出）
-.build/release/AirDial --sensitivity 1.3   # 更灵敏（0.5 更严格 … 1.5 更灵敏）
-.build/release/AirDial --ccw-up         # 反过来：逆时针加音量
-.build/release/AirDial --swipe-down-next   # 反过来：向下 = 下一首
-.build/release/AirDial --no-horizontal  # 关掉左右滑
-.build/release/AirDial --list-cameras   # 列出摄像头（--camera 名字 选择）
-.build/release/AirDial --debug          # 打印每帧识别到的手型
+.build/release/AirDial --dry-run           # recognise gestures but don't act; good for practising
+.build/release/AirDial --headless          # no preview window, runs in the background (Ctrl+C to quit)
+.build/release/AirDial --sensitivity 1.3   # more sensitive (0.5 strict ... 1.5 sensitive)
+.build/release/AirDial --ccw-up            # reverse the knob: counter-clockwise = volume up
+.build/release/AirDial --swipe-down-next   # reverse: swipe down = next track
+.build/release/AirDial --no-horizontal     # disable left/right two-finger swipes
+.build/release/AirDial --no-desktops       # disable open-palm desktop switching
+.build/release/AirDial --palm-follows      # palm right = desktop on the right
+.build/release/AirDial --list-cameras      # list cameras (pick one with --camera NAME)
+.build/release/AirDial --debug             # print the hand shape of every frame
+.build/release/AirDial --log frames.csv    # write per-frame diagnostics (see below)
 ```
 
-## 使用技巧
+## Tips
 
-- 手离摄像头 40–80 cm，手指**朝上**，手掌大致对着屏幕。手指直接指向摄像头时会被遮挡，识别会变差。
-- 画圈：圈大概一个拳头大小，0.5–2 秒一圈都可以。屏幕上点变绿说明"旋钮"已经接上，继续转就继续调。
-- 切歌：V 字手势，干脆地划一下就停。想连续切歌时，划完先放松手指再把手收回来。
-- 光线越好越稳。背光（背后是窗户）时效果会明显下降。
-- 预览窗口里的数字和轨迹可以帮你判断：如果圈转了很多度还不触发，用 `--sensitivity 1.3`；如果误触发，用 `--sensitivity 0.8`。
+- Keep your hand 30–60 cm from the screen and **high enough that your wrist is in the frame**. With the wrist cut off at the bottom edge, recognition gets much worse.
+- Circles: about a fist wide, 0.5–2 s per loop. When the dot turns green the "knob" is engaged; keep turning to keep adjusting.
+- Tracks: make the V and swipe once, crisply. To swipe again quickly, relax your fingers before bringing your hand back.
+- Desktops: raise an open palm, hold it until the preview says "Ready: swipe now", then swipe sideways.
+- More light is better. Backlight (a window behind you) makes it noticeably worse.
 
-## 项目结构
+## Tuning on real recordings
+
+`--log FILE` writes one CSV row per frame: Vision time, dropped frames, all 21 joints with their confidences, the recognised hand shape and any action. `AirDialReplay` feeds such a recording back through the gesture engine, so you can try thresholds on your own movements without the camera:
+
+```bash
+.build/release/AirDial --dry-run --log run.csv     # record while gesturing
+swift build -c release --product AirDialReplay
+.build/release/AirDialReplay run.csv --timeline                  # per-second view of poses and actions
+.build/release/AirDialReplay run.csv --set circleStepDegrees=180 # try a different threshold
+.build/release/AirDialReplay run.csv --min-conf 0.2 --trace 10-14
+```
+
+The log contains keypoint coordinates only, never images.
+
+## Project layout
 
 ```
-Sources/AirDialCore/   纯手势逻辑（不依赖摄像头，可单元测试）
-  GestureConfig.swift  所有阈值
-  HandPose.swift       手型判断
-  CircleTracker.swift  画圈识别
-  SwipeDetector.swift  滑动识别
-  GestureEngine.swift  去抖 + 滤波 + 调度
-  Geometry.swift       向量、One Euro 滤波
-Sources/AirDial/       macOS App
-  HandTracker.swift    摄像头 + Vision 手部关键点
-  MediaController.swift 媒体键 / AppleScript
-  PreviewWindow.swift  预览窗口和调试叠加层
-  main.swift           启动、参数、权限
-Tests/AirDialCoreTests/ 用合成手部轨迹测试识别和防误触
+Sources/AirDialCore/    Gesture logic only (no camera, unit-testable)
+  GestureConfig.swift   All thresholds
+  HandPose.swift        Hand shape classification
+  CircleTracker.swift   Circle detection
+  SwipeDetector.swift   Swipe detection
+  GestureEngine.swift   Debouncing, filtering, dispatch
+  Geometry.swift        Vectors, One Euro filter
+Sources/AirDial/        The macOS app
+  HandTracker.swift     Camera + Vision hand keypoints
+  MediaController.swift Media keys / AppleScript / desktop switching
+  PreviewWindow.swift   Preview window and debug overlay
+  main.swift            Startup, options, permissions, --log
+Sources/AirDialReplay/  Replays a --log recording through the gesture engine
+Tests/AirDialCoreTests/ Synthetic hand paths testing recognition and false-trigger protection
 ```
+
+## Known limitations
+
+- Vision's 2D keypoints are unreliable when a finger points straight at the camera: on a webcam it misreads a pointing finger as a fist on about a third of such frames. The time-based pose hold above bridges most of it.
+- Two-finger up/down swipes can be confused if the swipe starts with a wind-up in the opposite direction.
 
 ## License
 

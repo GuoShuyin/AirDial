@@ -45,15 +45,18 @@ final class OverlayView: NSView {
         // Status text
         let poseText: String
         switch status.pose {
-        case .point: poseText = "☝️ 单指：转圈调音量"
-        case .twoFingers: poseText = "✌️ 双指：上下/左右滑切歌"
-        case .openPalm: poseText = "🖐 手掌：左右挥切换桌面"
-        case .other: poseText = "未识别为手势"
-        case .none: poseText = "没有检测到手"
+        case .point: poseText = "☝️ One finger: circle for volume"
+        case .twoFingers: poseText = "✌️ Two fingers: swipe for tracks"
+        case .openPalm: poseText = "🖐 Open palm: hold, then swipe sideways for desktops"
+        case .other: poseText = "Not a gesture"
+        case .none: poseText = "No hand detected"
         }
         var lines = [poseText]
         if status.pose == .point {
-            lines.append(String(format: "旋转累计 %.0f°%@", status.circleDegrees, status.circleEngaged ? "  (已激活)" : ""))
+            lines.append(String(format: "Rotation %.0f°%@", status.circleDegrees, status.circleEngaged ? "  (engaged)" : ""))
+        }
+        if status.pose == .openPalm {
+            lines.append(status.palmArmed ? "Ready: swipe now" : "Hold your palm still…")
         }
         drawLabel(lines.joined(separator: "\n"), at: NSPoint(x: 14, y: bounds.height - 14), size: 16, topAligned: true)
 

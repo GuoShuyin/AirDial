@@ -2,7 +2,7 @@
 
 # AirDial
 
-### Minority Report for your Mac: control it with your bare hands, using only the webcam it already has.
+### Control your Mac with your bare hands, using only the webcam it already has.
 
 Point to move the cursor across all your displays. Tap your fingers to click, slide your thumb to scroll, draw a circle for volume, wave to switch desktops, and give a thumbs-up to talk, or to hand a spoken command to an AI agent. No extra hardware; hand tracking runs entirely on your Mac.
 
@@ -10,18 +10,48 @@ Point to move the cursor across all your displays. Tap your fingers to click, sl
 
 ## What you can do
 
-| | |
-| --- | --- |
-| <img src="docs/images/cursor.svg" width="280" alt="Pointing moves the cursor"> | ☝️ **Point with your index finger.** The mouse cursor follows your fingertip, across all your displays (calibrated at start-up). |
-| <img src="docs/images/left-click.svg" width="280" alt="Thumb taps the middle finger's first knuckle"> | **Tap your thumb tip on the middle finger's first knuckle** (the one by the fingertip). Left click. |
-| <img src="docs/images/right-click.svg" width="280" alt="Thumb taps the middle finger's second knuckle"> | **Tap your thumb tip on the middle finger's second knuckle.** Right click. |
-| <img src="docs/images/scroll.svg" width="280" alt="Thumb slides along the middle finger to scroll"> | **Slide your thumb along the middle finger.** Scrolls the page: towards the fingertip scrolls up, back towards the palm scrolls down. |
-| <img src="docs/images/volume.svg" width="280" alt="Two fingers together draw circles to change the volume"> | 🤞 **Hold index and middle finger together and draw circles.** Clockwise turns the volume up, counter-clockwise turns it down, one step per loop. |
-| <img src="docs/images/next-track.svg" width="280" alt="V sign swiped up or down skips the track"> | ✌️ **Make a V (fingers apart) and swipe quickly up or down.** Next track, in any player (Apple Music, Spotify, YouTube in a browser...). |
-| <img src="docs/images/desktops.svg" width="280" alt="Open palm swiped sideways switches desktops"> | 🖐 **Show an open palm to the camera and swipe quickly sideways.** Swipe right for the desktop on the left, swipe left for the desktop on the right. |
-| <img src="docs/images/mission-control.svg" width="280" alt="Open palm swiped up or down toggles Mission Control"> | 🖐 **Open palm, swipe up or down.** Mission Control opens; do it again to close it. |
-| <img src="docs/images/fullscreen.svg" width="280" alt="Opening a fist makes the window full screen, closing the hand exits"> | ✊→🖐 **Open a fist.** The front window goes full screen.<br>🖐→✊ **Close your hand.** It leaves full screen. |
-| <img src="docs/images/thumbs-up.svg" width="280" alt="Thumbs-up holds the Fn key for dictation; saying AGI hands the command to an AI agent"> | 👍 **Hold a thumbs-up.** AirDial holds down the Fn / 🌐 Globe key until you lower your thumb, so hold-to-talk dictation apps like Wispr Flow just work.<br>Say **"AGI"** in your sentence (e.g. *"AGI, open tomorrow in my calendar"*) and AirDial removes the dictated text and hands the command to a Claude computer-use agent, which looks at the display under your cursor and carries it out. Press **Esc** to stop the agent. |
+☝️ **Point with your index finger.** The mouse cursor follows your fingertip, across all your displays (calibrated at start-up).
+
+<p align="center"><img src="docs/images/cursor.svg" width="760" alt="Pointing moves the cursor"></p>
+
+**Tap your thumb tip on the middle finger's first knuckle** (the one by the fingertip). Left click.
+
+<p align="center"><img src="docs/images/left-click.svg" width="760" alt="Thumb taps the middle finger's first knuckle"></p>
+
+**Tap your thumb tip on the middle finger's second knuckle.** Right click.
+
+<p align="center"><img src="docs/images/right-click.svg" width="760" alt="Thumb taps the middle finger's second knuckle"></p>
+
+**Slide your thumb along the middle finger.** Scrolls the page: towards the fingertip scrolls up, back towards the palm scrolls down.
+
+<p align="center"><img src="docs/images/scroll.svg" width="760" alt="Thumb slides along the middle finger to scroll"></p>
+
+🤞 **Hold index and middle finger together and draw circles.** Clockwise turns the volume up, counter-clockwise turns it down, one step per loop.
+
+<p align="center"><img src="docs/images/volume.svg" width="760" alt="Two fingers together draw circles to change the volume"></p>
+
+✌️ **Make a V (fingers apart) and swipe quickly up or down.** Next track, in any player (Apple Music, Spotify, YouTube in a browser...).
+
+<p align="center"><img src="docs/images/next-track.svg" width="760" alt="V sign swiped up or down skips the track"></p>
+
+🖐 **Show an open palm to the camera and swipe quickly sideways.** Swipe right for the desktop on the left, swipe left for the desktop on the right.
+
+<p align="center"><img src="docs/images/desktops.svg" width="760" alt="Open palm swiped sideways switches desktops"></p>
+
+🖐 **Open palm, swipe up or down.** Mission Control opens; do it again to close it.
+
+<p align="center"><img src="docs/images/mission-control.svg" width="760" alt="Open palm swiped up or down toggles Mission Control"></p>
+
+✊→🖐 **Open a fist.** The front window goes full screen.  
+🖐→✊ **Close your hand.** It leaves full screen.
+
+<p align="center"><img src="docs/images/fullscreen.svg" width="760" alt="Opening a fist makes the window full screen, closing the hand exits"></p>
+
+👍 **Hold a thumbs-up.** AirDial holds down the Fn / 🌐 Globe key until you lower your thumb, so hold-to-talk dictation apps like Wispr Flow just work.  
+Say **"AGI"** in your sentence (e.g. *"AGI, open tomorrow in my calendar"*) and AirDial removes the dictated text and hands the command to a Claude computer-use agent, which looks at the display under your cursor and carries it out. Press **Esc** to stop the agent.
+
+<p align="center"><img src="docs/images/thumbs-up.svg" width="760" alt="Thumbs-up holds the Fn key for dictation; saying AGI hands the command to an AI agent"></p>
+
 
 ## Install
 

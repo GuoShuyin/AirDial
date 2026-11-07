@@ -2,7 +2,7 @@
 
 # AirDial
 
-### 把《少数派报告》搬到你的 Mac 上：只用自带的摄像头，空手隔空操控电脑。
+### 只用 Mac 自带的摄像头，空手隔空操控电脑。
 
 手指一指，光标跟着走，跨多块屏幕也行；指尖轻点就是点击，拇指一滑就能滚动；画个圈调音量，挥挥手切桌面；竖起大拇指就能说话输入，或者把说出的命令直接交给 AI 去执行。不需要任何额外硬件，手部识别全部在你的 Mac 本机完成。
 
@@ -10,18 +10,48 @@
 
 ## 能做什么
 
-| | |
-| --- | --- |
-| <img src="docs/images/cursor.svg" width="280" alt="伸食指指着，光标跟着走"> | ☝️ **伸出食指指着屏幕。** 鼠标光标跟着指尖走，多块显示器之间也能来回移动（启动时校准）。 |
-| <img src="docs/images/left-click.svg" width="280" alt="拇指点中指第一指关节"> | **拇指尖点一下中指的第一指关节**（靠指尖的那个）。左键单击。 |
-| <img src="docs/images/right-click.svg" width="280" alt="拇指点中指第二指关节"> | **拇指尖点一下中指的第二指关节。** 右键单击。 |
-| <img src="docs/images/scroll.svg" width="280" alt="拇指沿中指滑动来滚动"> | **拇指贴着中指滑动。** 页面跟着滚动：往指尖方向滑是向上滚，往手掌方向滑是向下滚。 |
-| <img src="docs/images/volume.svg" width="280" alt="食指中指并拢画圈调音量"> | 🤞 **食指和中指并拢，在空中画圈。** 顺时针加音量，逆时针减音量，每圈一格。 |
-| <img src="docs/images/next-track.svg" width="280" alt="比 V 字上下一划切歌"> | ✌️ **比个 V（两指分开），快速向上或向下一划。** 切到下一首，Apple Music、Spotify、网页里的 YouTube 都行。 |
-| <img src="docs/images/desktops.svg" width="280" alt="张开手掌左右挥切换桌面"> | 🖐 **张开手掌对着镜头，快速左右一挥。** 向右挥切到左边的桌面，向左挥切到右边的桌面。 |
-| <img src="docs/images/mission-control.svg" width="280" alt="张开手掌上下挥打开调度中心"> | 🖐 **张开手掌，向上或向下一挥。** 打开调度中心，再挥一次就关掉。 |
-| <img src="docs/images/fullscreen.svg" width="280" alt="拳头张开进入全屏，握拳退出全屏"> | ✊→🖐 **把拳头张开。** 最前面的窗口进入全屏。<br>🖐→✊ **把手握成拳。** 退出全屏。 |
-| <img src="docs/images/thumbs-up.svg" width="280" alt="竖大拇指按住 Fn 键听写，说出 AGI 交给 AI 代理执行"> | 👍 **竖起大拇指不放。** AirDial 会一直按住 Fn / 🌐 地球键，放下大拇指才松开，Wispr Flow 这类"按住说话"的听写工具直接就能用。<br>话里带上 **"AGI"**（比如 *"AGI，在日历里打开明天"*），AirDial 会删掉刚听写出的文字，把这句指令交给 Claude 电脑操作代理：它看着光标所在的那块屏幕，替你把事情办完。按 **Esc** 可以随时叫停。 |
+☝️ **伸出食指指着屏幕。** 鼠标光标跟着指尖走，多块显示器之间也能来回移动（启动时校准）。
+
+<p align="center"><img src="docs/images/cursor.svg" width="760" alt="伸食指指着，光标跟着走"></p>
+
+**拇指尖点一下中指的第一指关节**（靠指尖的那个）。左键单击。
+
+<p align="center"><img src="docs/images/left-click.svg" width="760" alt="拇指点中指第一指关节"></p>
+
+**拇指尖点一下中指的第二指关节。** 右键单击。
+
+<p align="center"><img src="docs/images/right-click.svg" width="760" alt="拇指点中指第二指关节"></p>
+
+**拇指贴着中指滑动。** 页面跟着滚动：往指尖方向滑是向上滚，往手掌方向滑是向下滚。
+
+<p align="center"><img src="docs/images/scroll.svg" width="760" alt="拇指沿中指滑动来滚动"></p>
+
+🤞 **食指和中指并拢，在空中画圈。** 顺时针加音量，逆时针减音量，每圈一格。
+
+<p align="center"><img src="docs/images/volume.svg" width="760" alt="食指中指并拢画圈调音量"></p>
+
+✌️ **比个 V（两指分开），快速向上或向下一划。** 切到下一首，Apple Music、Spotify、网页里的 YouTube 都行。
+
+<p align="center"><img src="docs/images/next-track.svg" width="760" alt="比 V 字上下一划切歌"></p>
+
+🖐 **张开手掌对着镜头，快速左右一挥。** 向右挥切到左边的桌面，向左挥切到右边的桌面。
+
+<p align="center"><img src="docs/images/desktops.svg" width="760" alt="张开手掌左右挥切换桌面"></p>
+
+🖐 **张开手掌，向上或向下一挥。** 打开调度中心，再挥一次就关掉。
+
+<p align="center"><img src="docs/images/mission-control.svg" width="760" alt="张开手掌上下挥打开调度中心"></p>
+
+✊→🖐 **把拳头张开。** 最前面的窗口进入全屏。  
+🖐→✊ **把手握成拳。** 退出全屏。
+
+<p align="center"><img src="docs/images/fullscreen.svg" width="760" alt="拳头张开进入全屏，握拳退出全屏"></p>
+
+👍 **竖起大拇指不放。** AirDial 会一直按住 Fn / 🌐 地球键，放下大拇指才松开，Wispr Flow 这类"按住说话"的听写工具直接就能用。  
+话里带上 **"AGI"**（比如 *"AGI，在日历里打开明天"*），AirDial 会删掉刚听写出的文字，把这句指令交给 Claude 电脑操作代理：它看着光标所在的那块屏幕，替你把事情办完。按 **Esc** 可以随时叫停。
+
+<p align="center"><img src="docs/images/thumbs-up.svg" width="760" alt="竖大拇指按住 Fn 键听写，说出 AGI 交给 AI 代理执行"></p>
+
 
 ## 安装
 

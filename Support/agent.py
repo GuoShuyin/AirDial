@@ -3,9 +3,9 @@
 
 AirDial starts this when your dictated sentence contains the trigger word ("AGI"):
 
-    agent.py --command "open tomorrow in my calendar" --region X,Y,W,H --cursor X,Y
+    agent.py --command "open tomorrow in my calendar" --displays X,Y,W,H;... --cursor X,Y
 
---region is the display (global points, top-left origin) and --cursor the mouse position in
+--displays lists every display (global points, top-left origin) and --cursor the mouse position in
 the same space. The script sends Claude the command, the cursor position and a screenshot of
 that display, then carries out Claude's mouse / keyboard actions on it until the task is done.
 Progress goes to stdout as JSON lines ({"status": ...}, {"done": ...}, {"error": ...}).
@@ -28,13 +28,15 @@ import anthropic
 import Quartz
 
 MODEL = "claude-opus-5-5"
-MAX_LONG_EDGE = 1568          # screenshot long edge sent to the model (pixels)
+MAX_LONG_EDGE = 2576          # screenshot long edge sent to the model (the toolset's maximum)
 TOOLSET = {"type": "computer_toolset_20260801"}
 NOT_EXECUTED = "Not executed: an earlier computer action in this turn failed."
 
-SYSTEM = """You operate the user's Mac on their behalf, on the one display shown in the screenshots.
-The user spoke a command while pointing at this display; "this", "here" or "that" usually means
-what is under their mouse cursor, whose position you are given. Carry the command out with the
+SYSTEM = """You operate the user's Mac on their behalf. The screenshots show ALL of the user's displays
+side by side as one image (black areas are outside any display); you are told where each display
+is and which windows are open where. The user spoke the command while pointing; "this", "here" or
+"that" usually means what is under their mouse cursor, whose position you are given. Text is
+small at this scale: use zoom to read a region before clicking small targets. Carry the command out with the
 computer tools, check the result with a screenshot, then stop and reply with one short sentence
 saying what you did.
 
@@ -197,6 +199,25 @@ def type_text(text):
         time.sleep(0.02)
 
 
+def window_list(d, limit=40):
+    """Visible app windows with titles and their rectangles in screenshot pixels."""
+    info = Quartz.CGWindowListCopyWindowInfo(
+        Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements, Quartz.kCGNullWindowID) or []
+    lines = []
+    for w in info:
+        if w.get("kCGWindowLayer", 1) != 0:
+            continue
+        b = w.get("kCGWindowBounds") or {}
+        if b.get("Width", 0) < 80 or b.get("Height", 0) < 60:
+            continue
+        a, t = d.to_shot(b["X"], b["Y"]); c, e = d.to_shot(b["X"] + b["Width"], b["Y"] + b["Height"])
+        title = (w.get("kCGWindowName") or "").strip()
+        lines.append(f"- {w.get('kCGWindowOwnerName', '?')}" + (f" \"{title[:80]}\"" if title else "") + f": x {a}-{c}, y {t}-{e}")
+        if len(lines) >= limit:
+            break
+    return "\n".join(lines) or "(none found)"
+
+
 def image_result(b64):
     return [{"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}]
 
@@ -266,19 +287,29 @@ def handle(d, name, inp):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--command", required=True)
-    ap.add_argument("--region", required=True, help="display X,Y,W,H in global points")
+    ap.add_argument("--displays", required=True, help="X,Y,W,H;X,Y,W,H;... every display in global points")
     ap.add_argument("--cursor", required=True, help="mouse X,Y in global points")
     ap.add_argument("--max-steps", type=int, default=40)
     args = ap.parse_args()
 
-    d = Display(*[float(v) for v in args.region.split(",")])
-    cx, cy = d.to_shot(*[float(v) for v in args.cursor.split(",")])
+    displays = [[float(v) for v in r.split(",")] for r in args.displays.split(";") if r]
+    x0 = min(r[0] for r in displays); y0 = min(r[1] for r in displays)
+    x1 = max(r[0] + r[2] for r in displays); y1 = max(r[1] + r[3] for r in displays)
+    d = Display(x0, y0, x1 - x0, y1 - y0)   # one virtual screen covering all displays
+    mx, my = [float(v) for v in args.cursor.split(",")]
+    cx, cy = d.to_shot(mx, my)
+    layout = []
+    for i, (x, y, w, h) in enumerate(displays):
+        a, b = d.to_shot(x, y); c, e = d.to_shot(x + w, y + h)
+        here = " (the mouse cursor is on this one)" if x <= mx < x + w and y <= my < y + h else ""
+        layout.append(f"display {i + 1}: x {a}-{c}, y {b}-{e}{here}")
     client = anthropic.Anthropic()   # ANTHROPIC_API_KEY from the environment
 
     emit(status=f"Looking at the screen for: {args.command}")
     messages = [{"role": "user", "content": [
-        {"type": "text", "text": f"Command: {args.command}\n\nThe mouse cursor is at x={cx}, y={cy} in this "
-                                 f"screenshot ({d.sw}x{d.sh} pixels)."},
+        {"type": "text", "text": f"Command: {args.command}\n\nThe screenshot is {d.sw}x{d.sh} pixels. "
+                                 f"Displays: " + "; ".join(layout) + f".\nThe mouse cursor is at x={cx}, y={cy}.\n\n"
+                                 f"Open windows (front to back):\n" + window_list(d)},
         *image_result(d.capture()),
     ]}]
 

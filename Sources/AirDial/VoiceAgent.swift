@@ -84,18 +84,18 @@ final class VoiceAgent {
         guard let key = apiKey() else {
             report("Agent: put ANTHROPIC_API_KEY in the .env file first."); return
         }
-        // The display under the mouse cursor, in global (top-left origin) points.
+        // All displays, in global (top-left origin) points: the agent sees them as one screen.
         let mouse = CGEvent(source: nil)?.location ?? .zero
         let mainHeight = NSScreen.screens.first?.frame.height ?? 0
         let displays = NSScreen.screens.map { s in
             CGRect(x: s.frame.minX, y: mainHeight - s.frame.maxY, width: s.frame.width, height: s.frame.height)
         }
-        let display = displays.first { $0.contains(mouse) } ?? displays.first ?? .zero
 
         let p = Process()
         p.executableURL = URL(fileURLWithPath: python)
         p.arguments = [script, "--command", command,
-                       "--region", "\(Int(display.minX)),\(Int(display.minY)),\(Int(display.width)),\(Int(display.height))",
+                       "--displays", displays.map { "\(Int($0.minX)),\(Int($0.minY)),\(Int($0.width)),\(Int($0.height))" }
+                           .joined(separator: ";"),
                        "--cursor", "\(Int(mouse.x)),\(Int(mouse.y))"]
         var env = ProcessInfo.processInfo.environment
         env["ANTHROPIC_API_KEY"] = key

@@ -24,6 +24,7 @@ public struct CircleTracker {
 
     private var window: [Point] = []
     private var progress: Double = 0
+    private var peakProgress: Double = 0  // furthest the knob got since the last step
     private var lastSample: Vec2?
     private var lastDir: Vec2?
     private var lastMoveTime: Double = 0
@@ -36,6 +37,7 @@ public struct CircleTracker {
         displayDegrees = 0
         window.removeAll()
         progress = 0
+        peakProgress = 0
         lastSample = nil
         lastDir = nil
     }
@@ -87,6 +89,7 @@ public struct CircleTracker {
         engaged = false
         engagedSign = 0
         progress = 0
+        peakProgress = 0
         if let last = window.last { window = [last] }
     }
 
@@ -135,6 +138,7 @@ public struct CircleTracker {
         engaged = true
         engagedSign = sign
         progress = 0
+        peakProgress = 0
         displayDegrees = 0
         if let last = window.last { window = [last] }
         return Int(sign)
@@ -143,13 +147,15 @@ public struct CircleTracker {
     private mutating func continueKnob(turn: Double, config c: GestureConfig) -> Int {
         progress += turn * engagedSign
         displayDegrees = progress * engagedSign
-        if progress < -c.circleReverseDegrees {
+        peakProgress = max(peakProgress, progress)
+        if progress < peakProgress - c.circleReverseDegrees {
             // Turned the other way: stop; the reverse direction must start fresh.
             disengage()
             return 0
         }
         guard progress >= c.circleStepDegrees else { return 0 }
         progress -= c.circleStepDegrees
+        peakProgress = progress
 
         // Keep turning only while the motion is still a consistent rotation.
         guard let s = recentStretch(reaching: c.circleStepDegrees, sign: engagedSign),

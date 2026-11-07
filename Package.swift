@@ -21,6 +21,8 @@ let package = Package(
                 ]),
             ]
         ),
+        // Dev tool: replay an `AirDial --log` recording through the gesture engine to tune thresholds.
+        .executableTarget(name: "AirDialReplay", dependencies: ["AirDialCore"]),
         .testTarget(name: "AirDialCoreTests", dependencies: ["AirDialCore"]),
     ]
 )

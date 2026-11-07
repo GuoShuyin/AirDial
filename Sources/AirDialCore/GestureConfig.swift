@@ -10,16 +10,18 @@ public struct GestureConfig {
     public var curledRatio: Double = 0.98
     /// Frames a new pose must be seen in a row before it becomes active.
     public var poseConfirmFrames: Int = 3
-    /// Frames of "no hand / other pose" tolerated before the active pose is dropped
-    /// (the model sometimes misreads a finger for a frame or two mid-gesture).
-    public var poseDropFrames: Int = 6
+    /// Seconds without seeing the active pose (no hand / other pose) before it is dropped.
+    /// Time-based, not frame-based: the model misreads the finger for several frames in a row
+    /// whenever it turns towards the camera mid-circle, and that must not reset the circle.
+    public var poseDropSeconds: Double = 0.5
 
     // MARK: Circle (one finger) -> volume
     /// Total rotation needed before the first volume step fires.
     /// Large on purpose so random hand movement never triggers it.
     public var circleStartDegrees: Double = 270
     /// Additional rotation per extra volume step once the knob is "engaged".
-    public var circleStepDegrees: Double = 90
+    /// 360 = one volume step per loop (N loops -> N steps, the first one at `circleStartDegrees`).
+    public var circleStepDegrees: Double = 360
     /// Fingertip path is resampled every `circleMinStep` so jitter doesn't add rotation.
     public var circleMinStep: Double = 0.012
     /// A single turn larger than this between two samples is treated as noise.
@@ -36,7 +38,7 @@ public struct GestureConfig {
     public var circleMinAspect: Double = 0.45
     /// std(radius) / mean(radius) must be at most this (rejects squiggles).
     public var circleMaxRadiusSpread: Double = 0.25
-    /// Turning the other way by this much disengages the knob.
+    /// Turning back by this much from the furthest point reached disengages the knob.
     public var circleReverseDegrees: Double = 120
     /// Finger standing still this long resets the circle.
     public var circleIdleReset: Double = 0.6

@@ -11,6 +11,7 @@ struct Options {
     var debug = false
     var listCameras = false
     var cameraName: String?
+    var logPath: String?
     var config = GestureConfig()
 
     static let usage = """
@@ -23,6 +24,7 @@ struct Options {
       --headless          No preview window (runs in the background, Ctrl+C to quit)
       --dry-run           Recognize gestures but don't change volume / tracks
       --debug             Print the raw pose of every frame
+      --log FILE          Write per-frame diagnostics (CSV) to FILE
       --camera NAME       Use the camera whose name contains NAME
       --list-cameras      List cameras and exit
       --ccw-up            Counter-clockwise = volume up (reverse the knob)
@@ -43,6 +45,9 @@ struct Options {
             case "--dry-run": o.dryRun = true
             case "--debug": o.debug = true
             case "--list-cameras": o.listCameras = true
+            case "--log":
+                i += 1
+                if i < args.count { o.logPath = args[i] }
             case "--camera":
                 i += 1
                 if i < args.count { o.cameraName = args[i] }
@@ -55,7 +60,7 @@ struct Options {
                 if i < args.count, let s = Double(args[i]), s > 0 {
                     let k = min(max(s, 0.3), 2.0)
                     o.config.circleStartDegrees = max(180, 270 / k)
-                    o.config.circleStepDegrees = 90 / k
+                    o.config.circleStepDegrees = 360 / k
                     o.config.circleMinDiameter = 0.07 / k
                     o.config.swipeMinDistance = 0.16 / k
                 }
@@ -83,6 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var preview: PreviewWindowController?
     var trail: [Vec2] = []
     var lastDebugPose: HandPose?
+    var log: FileHandle?
 
     init(options: Options) {
         self.options = options
@@ -149,8 +155,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        tracker.onFrame = { [weak self] sample, time, aspect in
-            DispatchQueue.main.async { self?.handle(sample, time: time, aspect: aspect) }
+        if let path = options.logPath {
+            FileManager.default.createFile(atPath: path, contents: nil)
+            log = FileHandle(forWritingAtPath: path)
+            log?.write(("t,vision_ms,dropped,hand_conf,wrist,indexTip,indexPIP,middleTip,middlePIP,ringTip,littleTip," +
+                        "raw_pose,active_pose,tip_x,tip_y,cursor_x,cursor_y,circle_deg,engaged,action," +
+                        HandTracker.logJoints.map { "\($0.0)_x,\($0.0)_y,\($0.0)_c" }.joined(separator: ",") + "\n").data(using: .utf8)!)
+            print("[AirDial] Logging frames to \(path)")
+        }
+
+        tracker.onFrame = { [weak self] sample, time, aspect, info in
+            DispatchQueue.main.async { self?.handle(sample, time: time, aspect: aspect, info: info) }
         }
 
         if !options.headless {
@@ -162,11 +177,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         print("[AirDial] Running. ☝️ draw circles for volume, ✌️ swipe for tracks." + (options.headless ? " Ctrl+C to quit." : ""))
     }
 
-    private func handle(_ sample: HandSample?, time: Double, aspect: Double) {
+    private func handle(_ sample: HandSample?, time: Double, aspect: Double, info: FrameInfo) {
         let actions = engine.process(sample, time: time)
         for a in actions { media.perform(a) }
 
         let status = engine.status
+        if let log = log {
+            func f(_ v: Double?) -> String { v.map { String(format: "%.4f", $0) } ?? "" }
+            let j = ["wrist", "indexTip", "indexPIP", "middleTip", "middlePIP", "ringTip", "littleTip"]
+                .map { String(format: "%.2f", info.jointConf[$0] ?? 0) }
+            let tip = sample?.tip(.index)
+            var cols: [String] = [String(format: "%.4f", time), String(format: "%.1f", info.visionMs), "\(info.droppedBefore)",
+                                  String(format: "%.2f", info.handConfidence)]
+            cols += j
+            cols += [status.rawPose.rawValue, status.pose.rawValue, f(tip?.x), f(tip?.y), f(status.cursor?.x), f(status.cursor?.y)]
+            cols += [String(format: "%.0f", status.circleDegrees), status.circleEngaged ? "1" : "0",
+                     actions.map { $0.rawValue }.joined(separator: "|")]
+            if info.rawJoints.isEmpty {
+                cols += Array(repeating: "", count: HandTracker.logJoints.count * 3)
+            } else {
+                for p in info.rawJoints {
+                    cols += [String(format: "%.4f", p.x), String(format: "%.4f", p.y), String(format: "%.2f", p.c)]
+                }
+            }
+            log.write((cols.joined(separator: ",") + "\n").data(using: .utf8)!)
+        }
         if options.debug, status.rawPose != lastDebugPose {
             print("[pose] raw=\(status.rawPose.rawValue) active=\(status.pose.rawValue)")
             lastDebugPose = status.rawPose
@@ -210,6 +245,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 // MARK: - Entry point
 
+setvbuf(stdout, nil, _IOLBF, 0)  // line-buffer output even when piped
 let options = Options.parse(Array(CommandLine.arguments.dropFirst()))
 
 if options.listCameras {

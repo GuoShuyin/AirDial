@@ -70,23 +70,23 @@ struct GestureEngineTests {
 
     @Test func testClockwiseCircleTurnsVolumeUp() {
         let e = GestureEngine()
-        // Two loops, 1 s per loop, radius 0.1 (a comfortable circle about a fist wide).
-        let actions = run(e, pose: .point, seconds: 2.0, path: circle(radius: 0.1, period: 1.0, clockwise: true))
-        #expect(actions.count >= 3, "\(actions)")
+        // Three loops, 1 s per loop, radius 0.1 (a comfortable circle about a fist wide): one step per loop.
+        let actions = run(e, pose: .point, seconds: 3.2, path: circle(radius: 0.1, period: 1.0, clockwise: true))
+        #expect(actions.count == 3, "\(actions)")
         #expect(actions.allSatisfy { $0 == .volumeUp }, "\(actions)")
     }
 
     @Test func testCounterClockwiseCircleTurnsVolumeDown() {
         let e = GestureEngine()
-        let actions = run(e, pose: .point, seconds: 2.0, path: circle(radius: 0.1, period: 1.0, clockwise: false))
-        #expect(actions.count >= 3, "\(actions)")
+        let actions = run(e, pose: .point, seconds: 3.2, path: circle(radius: 0.1, period: 1.0, clockwise: false))
+        #expect(actions.count == 3, "\(actions)")
         #expect(actions.allSatisfy { $0 == .volumeDown }, "\(actions)")
     }
 
     @Test func testSlowCircleStillWorks() {
         let e = GestureEngine()
-        let actions = run(e, pose: .point, seconds: 4.0, path: circle(radius: 0.12, period: 2.0, clockwise: true))
-        #expect(actions.count >= 3, "\(actions)")
+        let actions = run(e, pose: .point, seconds: 6.4, path: circle(radius: 0.12, period: 2.0, clockwise: true))
+        #expect(actions.count == 3, "\(actions)")
         #expect(actions.allSatisfy { $0 == .volumeUp })
     }
 
@@ -183,13 +183,28 @@ struct GestureEngineTests {
         let e = GestureEngine()
         var actions: [GestureAction] = []
         let path = circle(radius: 0.1, period: 1.0, clockwise: true)
-        for i in 0..<60 {
+        for i in 0..<96 {
             let t = Double(i) / fps
             // Every 10th frame the model "loses" the hand.
             let s: HandSample? = i % 10 == 5 ? nil : hand(pose: .point, tipAt: path(t), time: t)
             actions += e.process(s, time: t)
         }
-        #expect(actions.count >= 3, "\(actions)")
+        #expect(actions.count == 3, "\(actions)")
         #expect(actions.allSatisfy { $0 == .volumeUp })
+    }
+
+    @Test func testFingerMisreadEveryLoopDoesNotBreakCircle() {
+        // On a real webcam the finger is misread for several frames in a row once per loop,
+        // when it turns towards the camera. That must not reset the circle.
+        let e = GestureEngine()
+        var actions: [GestureAction] = []
+        let path = circle(radius: 0.1, period: 1.0, clockwise: true)
+        for i in 0..<96 {
+            let t = Double(i) / fps
+            let misread = (i % 30) >= 20 && (i % 30) < 28  // 8 frames per loop
+            actions += e.process(hand(pose: misread ? .other : .point, tipAt: path(t), time: t), time: t)
+        }
+        #expect(actions.count == 3, "\(actions)")
+        #expect(actions.allSatisfy { $0 == .volumeUp }, "\(actions)")
     }
 }

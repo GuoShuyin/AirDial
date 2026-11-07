@@ -24,7 +24,7 @@ public final class GestureEngine {
     private var activePose: HandPose = .none
     private var candidatePose: HandPose = .none
     private var candidateCount = 0
-    private var mismatchCount = 0
+    private var lastActiveSeen: Double = -.infinity
 
     private var filter: OneEuroFilter2D
     private var circle = CircleTracker()
@@ -41,7 +41,7 @@ public final class GestureEngine {
     public func process(_ sample: HandSample?, time: Double) -> [GestureAction] {
         let raw = PoseClassifier.classify(sample, config: config)
         status.rawPose = raw
-        updatePose(raw)
+        updatePose(raw, time: time)
         status.pose = activePose
 
         var actions: [GestureAction] = []
@@ -87,14 +87,13 @@ public final class GestureEngine {
         }
     }
 
-    private func updatePose(_ raw: HandPose) {
+    private func updatePose(_ raw: HandPose, time: Double) {
         if raw == activePose {
-            mismatchCount = 0
+            lastActiveSeen = time
             candidatePose = raw
             candidateCount = 0
             return
         }
-        mismatchCount += 1
         if raw == candidatePose {
             candidateCount += 1
         } else {
@@ -108,11 +107,11 @@ public final class GestureEngine {
             switchNow = candidateCount >= config.poseConfirmFrames
         } else {
             // Leaving a gesture pose is slower: tolerate a few misread frames mid-gesture.
-            switchNow = mismatchCount >= config.poseDropFrames
+            switchNow = time - lastActiveSeen > config.poseDropSeconds
         }
         if switchNow {
             activePose = raw
-            mismatchCount = 0
+            lastActiveSeen = time
             candidateCount = 0
             circle.reset()
             swipe.resetMotion()

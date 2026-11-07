@@ -20,8 +20,8 @@ Mid-air, BMW-style gestures for music on macOS, using the regular built-in webca
 
 ## How it works (and why no training is needed)
 
-1. **Hand keypoints**: Apple Vision's built-in `VNDetectHumanHandPoseRequest`, a pretrained model that returns 21 hand joints per frame. It takes about 7 ms per frame on Apple Silicon. The camera is pinned to 30 fps: in dim light the webcam would otherwise drop to ~15 fps with long exposures that smear a moving hand.
-2. **Hand shape**: for each finger, compare the tip-to-wrist distance with the PIP-to-wrist distance to decide whether it is extended. This separates ☝️ one finger / ✌️ two fingers / 🖐 open palm / anything else. Ratios rather than absolute distances, so it works at any distance from the camera.
+1. **Hand keypoints**: MediaPipe Hand Landmarker (21 joints in 2D and 3D, ~17 ms per frame including the round trip to the Python process) or, as a fallback, Apple Vision's built-in `VNDetectHumanHandPoseRequest` (2D only, ~7 ms). The camera is pinned to 30 fps: in dim light the webcam would otherwise drop to ~15 fps with long exposures that smear a moving hand.
+2. **Hand shape**: with 3D joints, a finger is extended when it bends less than 60° (PIP + DIP angle) and curled above 100°, independent of the viewing angle. In 2D (Vision), compare the tip-to-wrist distance with the PIP-to-wrist distance to decide whether it is extended. This separates ☝️ one finger / ✌️ two fingers / 🖐 open palm / anything else. Ratios rather than absolute distances, so it works at any distance from the camera.
 3. **Knob**: the thumb is held out (clearly seen, away from the palm), index and middle fingertips are visible, the middle finger isn't curled (that would be pointing) and ring and little finger aren't extended. A V sign often looks like that too, so the motion decides: turning rotates the thumb → fingertips direction while the hand stays in place (palm centre moved < 5% of the frame height in 0.5 s); a swipe moves the whole hand. Every 35° of turning is one volume step. To keep turning past your wrist's range, relax the grip, turn back and grip again.
    **Circles** (off by default since one finger is the cursor; `--circle-volume` turns them on): no circle fitting. AirDial adds up how much the direction of the fingertip's motion turns. One loop is ±360°; straight lines and back-and-forth motion add up to about 0. To start, the path must turn 270° or more, at least 85% of it in one direction, and be big enough, not flat and round enough. After that, every further full loop (360°) is one more volume step, so N loops give N steps. Turning back 120° from the furthest point reached stops the knob.
 4. **Swipes**: the midpoint of the two fingertips moves more than 16% of the frame height within 0.45 s, with the main-axis travel at least 1.8× the cross-axis travel. Up and down both mean "next track": on a webcam a swipe often starts with a quick wind-up the other way, so the two directions can't be told apart reliably (`--vertical-prev` restores down = previous).
@@ -52,6 +52,18 @@ With only the Command Line Tools (no Xcode), `swift test` cannot find a test fra
 F=/Library/Developer/CommandLineTools/Library/Developer/Frameworks
 swift test --disable-xctest --enable-swift-testing -Xswiftc -F -Xswiftc $F -Xlinker -F -Xlinker $F -Xlinker -rpath -Xlinker $F
 ```
+
+### 3D hand tracking (recommended)
+
+By default AirDial uses Google's MediaPipe Hand Landmarker, which gives 3D joints: finger bending, pinches and turning the knob are then measured in 3D and work from any camera angle. It runs offline in a small local Python process (`Support/mediapipe_hands.py`); AirDial keeps the camera and frames never leave your Mac. Without it, AirDial falls back to Apple Vision (2D only, less accurate).
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install mediapipe numpy
+mkdir -p models && curl -L -o models/hand_landmarker.task \
+  https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+```
+
+`--tracker vision` forces Apple Vision; `--python PATH` / `--model PATH` point elsewhere.
 
 On first run macOS asks for permissions. They are granted to **the app you launched AirDial from** (Terminal / iTerm / VS Code):
 
@@ -124,11 +136,13 @@ Sources/AirDialCore/    Gesture logic only (no camera, unit-testable)
   GestureEngine.swift   Debouncing, filtering, dispatch
   Geometry.swift        Vectors, One Euro filter
 Sources/AirDial/        The macOS app
-  HandTracker.swift     Camera + Vision hand keypoints
+  HandTracker.swift     Camera + hand keypoints (MediaPipe or Vision)
+  MediaPipeBackend.swift Talks to the local MediaPipe process
   MediaController.swift Media keys / AppleScript / desktop switching
   CursorController.swift Moves / clicks the real mouse cursor
   PreviewWindow.swift   Preview window and debug overlay
   main.swift            Startup, options, permissions, --log
+Support/mediapipe_hands.py  The MediaPipe hand tracker process
 Sources/AirDialReplay/  Replays a --log recording through the gesture engine
 Tests/AirDialCoreTests/ Synthetic hand paths testing recognition and false-trigger protection
 ```

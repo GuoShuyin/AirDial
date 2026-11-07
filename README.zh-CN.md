@@ -53,6 +53,18 @@ F=/Library/Developer/CommandLineTools/Library/Developer/Frameworks
 swift test --disable-xctest --enable-swift-testing -Xswiftc -F -Xswiftc $F -Xlinker -F -Xlinker $F -Xlinker -rpath -Xlinker $F
 ```
 
+### 3D 手部跟踪（推荐）
+
+AirDial 默认使用 Google 的 MediaPipe Hand Landmarker，它能给出 3D 关节：手指弯曲、捏合、拧旋钮都按 3D 计算，从任何角度拍都能用。它在一个本地 Python 小进程（`Support/mediapipe_hands.py`）里离线运行；摄像头仍由 AirDial 打开，画面不会离开你的电脑。没装的话会自动退回 Apple Vision（只有 2D，准确度差一些）。
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install mediapipe numpy
+mkdir -p models && curl -L -o models/hand_landmarker.task \
+  https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+```
+
+`--tracker vision` 强制用 Apple Vision；`--python 路径` / `--model 路径` 可以指定别的位置。
+
 第一次运行时 macOS 会请求权限，都是授予**你启动它的那个 App**（Terminal / iTerm / VS Code）：
 
 1. **摄像头**：弹窗点"允许"。如果之前拒绝过：系统设置 → 隐私与安全性 → 摄像头 → 打开你的终端 App，然后**完全退出并重新打开**它。
@@ -124,11 +136,13 @@ Sources/AirDialCore/    纯手势逻辑（不依赖摄像头，可以单元测�
   GestureEngine.swift   去抖、滤波、调度
   Geometry.swift        向量、One Euro 滤波
 Sources/AirDial/        macOS App
-  HandTracker.swift     摄像头 + Vision 手部关键点
+  HandTracker.swift     摄像头 + 手部关键点（MediaPipe 或 Vision）
+  MediaPipeBackend.swift 和本地 MediaPipe 进程通信
   MediaController.swift 媒体键 / AppleScript / 切换桌面
   CursorController.swift 移动 / 点击真实的鼠标光标
   PreviewWindow.swift   预览窗口和调试叠加层
   main.swift            启动、参数、权限、--log
+Support/mediapipe_hands.py  MediaPipe 手部跟踪进程
 Sources/AirDialReplay/  把 --log 录像回放给手势引擎
 Tests/AirDialCoreTests/ 用合成的手部轨迹测试识别和防误触
 ```

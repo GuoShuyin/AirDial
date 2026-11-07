@@ -58,15 +58,19 @@ final class CalibrationController {
         self.onDone = onDone
         // Left to right, so the sequence follows the display arrangement.
         let order = screens.indices.sorted { screens[$0].minX < screens[$1].minX }
-        for s in order {
-            for t in PointerCalibration.targets { targets.append(Target(screen: s, x: t.x, y: t.y)) }
+        for t in PointerCalibration.targets(screenCount: screens.count, order: order) {
+            targets.append(Target(screen: t.screen, x: t.x, y: t.y))
         }
     }
 
     func start() {
         isActive = true
         for (i, s) in nsScreens.enumerated() where i < screens.count {
-            let w = NSWindow(contentRect: s.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            // Created for that screen explicitly (rect relative to it), then placed on its frame:
+            // a plain global rect left the window off the MacBook display.
+            let w = NSWindow(contentRect: NSRect(origin: .zero, size: s.frame.size), styleMask: .borderless,
+                             backing: .buffered, defer: false, screen: s)
+            w.setFrame(s.frame, display: true)
             w.isOpaque = false
             w.backgroundColor = .clear
             w.level = .statusBar

@@ -68,6 +68,43 @@ struct Hand3DTests {
         #expect(run([(middleTip + Vec3(0.005, 0, 0), 40)]) == [])
     }
 
+    @Test func testLiftingARestingThumbAndTappingIsARightClick() {
+        // Resting on the knuckle, lift ~2 cm, tap down again.
+        let rest = middlePIP + Vec3(0, 0.008, 0)
+        #expect(run([(rest, 30), (rest + Vec3(0, 0.02, 0.01), 4), (rest, 6)]) == [.rightClick])
+    }
+
+    private func scrollTotal(_ thumbs: [(Vec3, Int)]) -> (Double, [PointerTracker.Event]) {
+        var p = PointerTracker()
+        var total = 0.0
+        var out: [PointerTracker.Event] = []
+        var t = 0.0
+        for (thumb, frames) in thumbs {
+            for _ in 0..<frames {
+                if let e = p.update(hand3D(thumb: thumb, time: t), time: t, aspect: 4.0 / 3.0) { out.append(e) }
+                total += p.scroll
+                t += 1.0 / 30
+            }
+        }
+        return (total, out)
+    }
+
+    @Test func testSlidingTheThumbAlongTheMiddleFingerScrolls() {
+        // Thumb touching the middle finger, sliding from the knuckle towards the fingertip and back.
+        let a = Vec3(-0.005, 0.03, -0.004)       // on the middle phalanx, near the PIP
+        let b = Vec3(-0.005, 0.022, -0.032)      // near the DIP / fingertip end
+        var forward: [(Vec3, Int)] = [(a, 6)]
+        for k in 1...20 { forward.append((a + (b - a) * (Double(k) / 20), 1)) }
+        let (up, events) = scrollTotal(forward + [(b, 4)])
+        #expect(up > 100)                         // scrolled up
+        #expect(events.isEmpty)                   // and no clicks
+        var back: [(Vec3, Int)] = [(b, 6)]
+        for k in 1...20 { back.append((b + (a - b) * (Double(k) / 20), 1)) }
+        let (down, events2) = scrollTotal(back + [(a, 4)])
+        #expect(down < -100)
+        #expect(events2.isEmpty)
+    }
+
     @Test func testSlowlySlidingOntoTheKnuckleIsNotATap() {
         // Thumb comes from far away but takes 5 s to arrive (the last 4 cm alone take well over
         // the 0.6 s tap window): a slide, not a tap.

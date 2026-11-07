@@ -48,6 +48,8 @@ struct Options {
       --no-hand-shapes    Disable fist = exit full screen, open hand = full screen
       --circle-volume     Also change volume by circling the index finger (off: it fights the cursor)
       --knob              Also use the three-finger knob for volume (turn right = up)
+      --no-scroll         Disable thumb sliding along the middle finger = scroll wheel
+      --scroll-reverse    Sliding towards the fingertip scrolls down
       --pinch-index       Click by pinching thumb + index (default: thumb + middle finger)
       --no-cursor         Don't move the mouse cursor with the index finger
       --palm-hold         Strict: hold the open palm still for a moment before it can swipe
@@ -93,6 +95,8 @@ struct Options {
             case "--palm-hold": o.config.palmRequireHold = true
             case "--no-cursor": o.config.enablePointer = false
             case "--pinch-index": o.config.pinchFinger = .index
+            case "--no-scroll": o.config.enableScroll = false
+            case "--scroll-reverse": o.config.scrollReverse = true
             case "--circle-volume": o.config.enableCircleVolume = true
             case "--knob": o.config.enableKnob = true
             case "--no-hand-shapes": o.config.enableHandShapes = false
@@ -265,6 +269,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if let p = engine.status.pointer { cursor.move(to: p, tip: engine.status.pointerTip) }
+        if engine.status.scroll != 0 { cursor.scroll(pixels: engine.status.scroll) }
         for a in actions {
             switch a {
             case .pointerPress: cursor.press()

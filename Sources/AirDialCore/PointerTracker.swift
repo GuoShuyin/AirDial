@@ -31,8 +31,18 @@ public struct PointerTracker {
     private var frozenAt: Vec2?
     private var lastTip: Vec2?
     private var lastPalm: (t: Double, p: Vec2)?
-    private var lastFarLeft: Double = -.infinity    // last time the thumb was away from the fingertip
-    private var lastFarRight: Double = -.infinity   // ... and from the middle finger's second knuckle
+    // Recent thumb distances (3D) to the left / right click targets, for telling a tap (lift and
+    // come down) from a thumb simply resting there.
+    private var leftHistory: [(t: Double, d: Double)] = []
+    private var rightHistory: [(t: Double, d: Double)] = []
+    private var contactHistory: [(t: Double, d: Double)] = []   // thumb to the whole middle finger
+    // Scrolling: the thumb sliding along the middle finger.
+    private var lastArc: Double?
+    private var contactSince: Double?
+    private var slid = 0.0
+    private var scrolling = false
+    /// Scroll amount for this frame, pixels (+ = up). 0 when not scrolling.
+    public private(set) var scroll: Double = 0
     private var rightFrames = 0
     private var rightLatched = false
     private var config: GestureConfig
@@ -61,10 +71,32 @@ public struct PointerTracker {
         lastPalm = nil
         rightFrames = 0
         rightLatched = false
-        lastFarLeft = -.infinity
-        lastFarRight = -.infinity
+        leftHistory.removeAll()
+        rightHistory.removeAll()
+        contactHistory.removeAll()
+        lastArc = nil
+        contactSince = nil
+        slid = 0
+        scrolling = false
+        scroll = 0
         filter.reset()
         return wasPressed ? .release : nil
+    }
+
+    /// Closest point on a polyline: (distance, arc length from the first point).
+    static func closest(_ p: Vec3, on pts: [Vec3]) -> (d: Double, arc: Double) {
+        var best = (d: Double.infinity, arc: 0.0)
+        var run = 0.0
+        for i in 0..<(pts.count - 1) {
+            let a = pts[i], b = pts[i + 1], ab = b - a
+            let len2 = ab.dot(ab)
+            let u = len2 > 1e-12 ? max(0, min(1, (p - a).dot(ab) / len2)) : 0
+            let q = a + ab * u
+            let d = p.distance(to: q)
+            if d < best.d { best = (d, run + u * len2.squareRoot()) }
+            run += len2.squareRoot()
+        }
+        return best
     }
 
     /// Hand scale used for the pinch threshold: knuckle width, or index MCP-PIP length.
@@ -81,6 +113,7 @@ public struct PointerTracker {
 
         // Pinch state with hysteresis and a couple of frames of debounce.
         var event: Event?
+        scroll = 0
         var speed = Double.infinity
         if let palm = s.palmCenter {
             if let last = lastPalm, t > last.t { speed = palm.distance(to: last.p) / (t - last.t) }
@@ -89,14 +122,52 @@ public struct PointerTracker {
         // 3D: the real distance between the fingertips. 2D: relative to the knuckle width.
         var pinchDistance: (d: Double, close: Double, open: Double)?
         var freezeDistance: Double?       // nearest click target, for freezing the pointer
-        var mustTap = false               // 3D: the thumb has to come from further away (a tap)
+        var mustTap = false               // 3D: the thumb has to lift and come down (a tap)
+        var leftTapped = false
         if let w = s.world, let tip3 = s.worldTip(c.pinchFinger) {
             let thumb = w[HandSample.worldThumbTip]
             let dL = thumb.distance(to: tip3)
             // Right click: thumb tip tapping the middle finger's second knuckle (PIP).
             let dR = c.enableRightClick ? thumb.distance(to: w[HandSample.worldJoints(.middle)[1]]) : Double.infinity
-            if dL > c.pinchOpen3D { lastFarLeft = t }
-            if dR > c.pinchOpen3D { lastFarRight = t }
+            leftHistory.append((t, dL)); rightHistory.append((t, dR))
+            while let f = leftHistory.first, t - f.t > c.tapWindow { leftHistory.removeFirst() }
+            while let f = rightHistory.first, t - f.t > c.tapWindow { rightHistory.removeFirst() }
+            // Distance to the whole middle finger: lifting off it is a tap, sliding along it is not.
+            let middle = HandSample.worldJoints(.middle).map { w[$0] }
+            let contact = PointerTracker.closest(thumb, on: middle)
+            contactHistory.append((t, contact.d))
+            while let f = contactHistory.first, t - f.t > c.tapWindow { contactHistory.removeFirst() }
+            let lifted = (contactHistory.map { $0.d }.max() ?? 0) - contact.d >= c.tapLift
+
+            // Scroll wheel: thumb in contact with the middle finger, sliding along it.
+            if c.enableScroll, contact.d < c.scrollContact3D {
+                if contactSince == nil { contactSince = t }
+                if let last = lastArc {
+                    let delta = contact.arc - last
+                    if abs(delta) < 0.02 { slid += delta }   // ignore glitches
+                    if !scrolling, abs(slid) >= c.scrollDeadZone3D, t - (contactSince ?? t) >= 0.1 { scrolling = true; slid = 0 }
+                    if scrolling, abs(delta) < 0.02 {
+                        // Towards the fingertip (arc grows) = scroll up, like rolling a wheel forward.
+                        scroll = delta * c.scrollPixelsPerMetre * (c.scrollReverse ? -1 : 1)
+                    }
+                }
+                lastArc = contact.arc
+            } else if contact.d > c.pinchOpen3D {
+                lastArc = nil
+                contactSince = nil
+                slid = 0
+                scrolling = false
+            }
+
+            // A tap: within the window the thumb was at least `tapLift` further from the finger than now
+            // (and it isn't sliding along it).
+            let tapOK = lifted && !scrolling
+            if c.pinchFinger == .middle {
+                leftTapped = tapOK && dL <= dR
+            } else {
+                leftTapped = (leftHistory.map { $0.d }.max() ?? 0) - dL >= c.tapLift && !scrolling
+            }
+            let rightTapped = tapOK && dR < dL
             freezeDistance = min(dL, dR)
             mustTap = true
             // The nearer target decides: a thumb on the knuckle is not also a left pinch.
@@ -104,7 +175,8 @@ public struct PointerTracker {
 
             if dR < c.pinchClose3D, dR < dL, speed < c.pinchMaxSpeed { rightFrames += 1 }
             else if dR > c.pinchOpen3D { rightFrames = 0; rightLatched = false }
-            if !rightLatched, rightFrames >= c.pinchFrames, t - lastFarRight <= c.tapWindow {
+            else { rightFrames = 0 }
+            if !rightLatched, rightFrames >= c.pinchFrames3D, rightTapped {
                 rightLatched = true
                 event = .rightClick
             }
@@ -118,7 +190,7 @@ public struct PointerTracker {
             if d < closeAt, pressed || speed < c.pinchMaxSpeed { closedFrames += 1; openFrames = 0 }
             else if d > openAt { openFrames += 1; closedFrames = 0 }
             else if speed >= c.pinchMaxSpeed { closedFrames = 0 }
-            if !pressed, closedFrames >= c.pinchFrames, !mustTap || t - lastFarLeft <= c.tapWindow, event == nil {
+            if !pressed, closedFrames >= (mustTap ? c.pinchFrames3D : c.pinchFrames), !mustTap || leftTapped, event == nil {
                 pressed = true
                 event = .press
             } else if pressed, openFrames >= c.pinchReleaseFrames {

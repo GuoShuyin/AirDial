@@ -8,9 +8,9 @@ import Foundation
 /// the fingertip was at `tip` (AirDial camera coordinates: x to your right, y up).
 ///
 /// Horizontally the samples of all displays form one piecewise-linear curve (fingertip x ->
-/// global x), so pointing further right moves across displays in order. Vertically each display
-/// gets its own straight-line fit (fingertip y -> y on that display), because displays sit at
-/// different heights.
+/// global x), so pointing further right moves across displays in order. Vertically one scale
+/// (pixels per unit of fingertip height) comes from the display calibrated at several heights,
+/// and each display's own sample lines it up, because displays sit at different heights.
 public struct PointerCalibration: Codable, Equatable {
     public struct Sample: Codable, Equatable {
         public var screen: Int
@@ -37,8 +37,16 @@ public struct PointerCalibration: Codable, Equatable {
         self.screens = screens
     }
 
-    /// The targets to show on each display, as fractions (x right, y down).
-    public static let targets: [(x: Double, y: Double)] = [(0.1, 0.1), (0.5, 0.5), (0.9, 0.9)]
+    /// The targets to show: the centre of every display, plus the top and bottom centre of the
+    /// main display (index 0) for the vertical scale. Fractions of the display, x right, y down.
+    public static func targets(screenCount: Int, order: [Int]) -> [(screen: Int, x: Double, y: Double)] {
+        var t = order.map { (screen: $0, x: 0.5, y: 0.5) }
+        if screenCount > 0 {
+            t.append((screen: 0, x: 0.5, y: 0.15))
+            t.append((screen: 0, x: 0.5, y: 0.85))
+        }
+        return t
+    }
 
     /// Usable when it was made for the same display layout and covers every display.
     public func isValid(for current: [CGRect]) -> Bool {
@@ -76,17 +84,25 @@ public struct PointerCalibration: Codable, Equatable {
             ?? screens.indices.min { abs(Double(screens[$0].midX) - x) < abs(Double(screens[$1].midX) - x) }!
         let screen = screens[index]
 
-        // Vertical: straight-line fit of that display's samples (or all samples if it has < 2).
+        // Vertical, in pixels: one scale (pixels per unit of fingertip height) from the display(s)
+        // calibrated at several heights, and each display's own samples to line it up.
+        func gy(_ s: Sample) -> Double { Double(screens[s.screen].minY) + s.targetY * Double(screens[s.screen].height) }
+        var num = 0.0, den = 0.0
+        for i in screens.indices {
+            let own = samples.filter { $0.screen == i }
+            guard own.count >= 2, Set(own.map { $0.targetY }).count >= 2 else { continue }
+            let mt = own.map { $0.tipY }.reduce(0, +) / Double(own.count)
+            let mg = own.map(gy).reduce(0, +) / Double(own.count)
+            for s in own { num += (s.tipY - mt) * (gy(s) - mg); den += (s.tipY - mt) * (s.tipY - mt) }
+        }
+        // Fallback: the fingertip's full height range spans the main display's height.
+        let slope = den > 1e-9 ? num / den : -Double(screens[0].height) / 0.4
         var own = samples.filter { $0.screen == index }
-        if own.count < 2 { own = samples }
-        let ys = own.map { (tip: $0.tipY, frac: $0.targetY) }
-        let mt = ys.map { $0.tip }.reduce(0, +) / Double(ys.count)
-        let mf = ys.map { $0.frac }.reduce(0, +) / Double(ys.count)
-        let cov = ys.reduce(0) { $0 + ($1.tip - mt) * ($1.frac - mf) }
-        let varT = ys.reduce(0) { $0 + ($1.tip - mt) * ($1.tip - mt) }
-        let slope = varT > 1e-9 ? cov / varT : -2.0   // fallback: higher fingertip = higher on screen
-        let frac = mf + slope * (tip.y - mt)
-        let y = Double(screen.minY) + min(max(frac, 0), 1) * Double(screen.height - 1)
+        if own.isEmpty { own = samples }
+        let mt = own.map { $0.tipY }.reduce(0, +) / Double(own.count)
+        let mg = own.map(gy).reduce(0, +) / Double(own.count)
+        let yRaw = mg + slope * (tip.y - mt)
+        let y = min(max(yRaw, Double(screen.minY)), Double(screen.maxY) - 1)
         return CGPoint(x: x, y: y)
     }
 }

@@ -101,6 +101,18 @@ final class CursorController {
         print("[AirDial] Right click at (\(Int(at.x)), \(Int(at.y)))")
     }
 
+    /// Scroll wheel, in pixels (+ = up). Small amounts are accumulated until a whole pixel.
+    private var scrollRemainder = 0.0
+    func scroll(pixels: Double) {
+        guard canPost(), Date() >= pausedUntil else { return }
+        scrollRemainder += pixels
+        let whole = Int32(scrollRemainder.rounded(.towardZero))
+        guard whole != 0 else { return }
+        scrollRemainder -= Double(whole)
+        CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: whole, wheel2: 0, wheel3: 0)?
+            .post(tap: .cghidEventTap)
+    }
+
     /// The pinch opened again: nothing to do, the click was already complete.
     func release() {}
 

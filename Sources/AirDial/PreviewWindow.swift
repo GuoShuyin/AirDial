@@ -49,6 +49,7 @@ final class OverlayView: NSView {
         case .twoFingers: poseText = status.fingersTogether ? "🤞 Two fingers together: circle for volume" : "✌️ V: swipe for next track"
         case .openPalm: poseText = "🖐 Open palm: swipe (sideways: desktops, up/down: Mission Control)"
         case .fist: poseText = "✊ Fist (open it: full screen)"
+        case .thumbsUp: poseText = "👍 Thumbs up: Fn held"
         case .other: poseText = "Not a gesture"
         case .none: poseText = "No hand detected"
         }

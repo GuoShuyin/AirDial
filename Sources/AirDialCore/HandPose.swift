@@ -72,6 +72,7 @@ public enum HandPose: String {
     case twoFingers  // index + middle extended     -> swipe = track
     case openPalm    // index + middle + ring extended -> sideways swipe = switch desktop
     case fist        // all fingers curled                -> palm <-> fist = minimize / full screen
+    case thumbsUp    // fist with the thumb up (3D only)  -> hold the Fn / Globe key
     case other       // open palm, fist, etc.
 }
 
@@ -108,6 +109,7 @@ public enum PoseClassifier {
 
     public static func classify(_ s: HandSample?, config: GestureConfig) -> HandPose {
         guard let s = s, s.wrist != nil, s.tip(.index) != nil else { return .none }
+        if let pose = classify3D(s, config: config) { return pose }
         let index = state(of: .index, in: s, config: config)
         let middle = state(of: .middle, in: s, config: config)
         let ring = state(of: .ring, in: s, config: config)
@@ -119,6 +121,12 @@ public enum PoseClassifier {
         let littleFolded = little != .extended
 
         if index == .extended, middle == .extended, ring == .extended, little != .curled {
+            return .openPalm
+        }
+        // 3D: a waving hand is relaxed (fingers bent 60-80 degrees), so for the open palm it's
+        // enough that no finger is anywhere near curled.
+        if let bends = Optional(Finger.allCases.compactMap { s.bend($0) }), bends.count == 4,
+           bends.allSatisfy({ $0 < config.palmOpenBendMax }) {
             return .openPalm
         }
         if index == .extended, middle == .extended, ringFolded, littleFolded, ring == .curled || little == .curled {
@@ -134,6 +142,25 @@ public enum PoseClassifier {
     }
 }
 
+extension PoseClassifier {
+    /// 3D-only shapes and refinements; nil = use the general rules.
+    static func classify3D(_ s: HandSample, config c: GestureConfig) -> HandPose? {
+        guard let w = s.world, let bi = s.bend(.index), let bm = s.bend(.middle),
+              let br = s.bend(.ring), let bl = s.bend(.little) else { return nil }
+        let othersCurled = bm >= c.bendCurledMin && br >= c.bendCurledMin - 10 && bl >= c.bendCurledMin - 10
+        if bi >= c.bendCurledMin, othersCurled {
+            // A fist; with the thumb sticking out upwards it's a thumbs-up.
+            let thumbOut = w[4].distance(to: w[5]) >= c.thumbsUpOut3D
+            let thumbUp = w[4].y - w[2].y >= c.thumbsUpRise3D
+            return thumbOut && thumbUp ? .thumbsUp : .fist
+        }
+        // Pointing down / towards the camera bends the index in the estimate (~90 degrees at the
+        // camera display's bottom corners) while the other fingers stay curled: still pointing.
+        if bi < c.bendCurledMin, othersCurled { return .point }
+        return nil
+    }
+}
+
 extension HandSample {
     /// Mean of the fingertips: moves much more than the palm centre in a quick wrist flick.
     public var fingertipCenter: Vec2? {
@@ -141,6 +168,23 @@ extension HandSample {
         guard !tips.isEmpty else { return nil }
         let n = Double(tips.count)
         return Vec2(tips.reduce(0) { $0 + $1.x } / n, tips.reduce(0) { $0 + $1.y } / n)
+    }
+
+    /// 3D: how squarely the palm faces the camera, 0 (edge-on) ... 1 (flat to the camera).
+    public var palmFacing: Double? {
+        guard let w = world else { return nil }
+        let n = (w[5] - w[0]).cross(w[17] - w[0])
+        let len = n.length
+        return len > 1e-9 ? abs(n.z) / len : nil
+    }
+
+    /// A deliberate palm gesture: the palm flat to the camera from up close. With 3D joints:
+    /// facing the camera and not tiny; with 2D only: wide enough in the picture.
+    public func palmIsDeliberate(_ c: GestureConfig) -> Bool {
+        if let f = palmFacing {
+            return f >= c.palmMinFacing3D && (palmWidth ?? 0) >= c.palmMinWidth3D
+        }
+        return (palmWidth ?? 0) >= c.palmMinWidth
     }
 
     /// Index MCP to little MCP distance: how wide the palm looks. Large when the palm faces the

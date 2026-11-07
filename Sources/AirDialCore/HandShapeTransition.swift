@@ -21,7 +21,7 @@ public struct HandShapeTransition {
     public init() {}
 
     public mutating func add(raw: HandPose, sample: HandSample?, time t: Double, config c: GestureConfig) -> Kind? {
-        let wide = (sample?.palmWidth ?? 0) >= c.palmMinWidth
+        let wide = sample?.palmIsDeliberate(c) ?? false
         let shape: HandPose = (raw == .openPalm || raw == .fist) && wide ? raw : .other
 
         if shape == .other {

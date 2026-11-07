@@ -51,6 +51,12 @@ final class MediaController {
         print("[AirDial] \(action.rawValue)\(dryRun ? " (dry run)" : "")")
         guard !dryRun else { return }
 
+        if action == .fnDown || action == .fnUp {
+            guard hasAccessibility else { print("[AirDial] The Fn key needs Accessibility permission."); return }
+            postFn(down: action == .fnDown)
+            return
+        }
+
         if action == .exitFullScreen || action == .enterFullScreen {
             guard hasAccessibility else {
                 print("[AirDial] Full screen control needs Accessibility permission for your terminal app.")
@@ -80,7 +86,7 @@ final class MediaController {
             case .nextTrack: postMediaKey(.next)
             case .previousTrack: postMediaKey(.previous)
             case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .pointerRightClick,
-                 .exitFullScreen, .enterFullScreen: break
+                 .exitFullScreen, .enterFullScreen, .fnDown, .fnUp: break
             }
             return
         }
@@ -95,7 +101,7 @@ final class MediaController {
         case .previousTrack:
             tellPlayer("previous track")
         case .desktopLeft, .desktopRight, .missionControl, .pointerPress, .pointerRelease, .pointerRightClick,
-             .exitFullScreen, .enterFullScreen:
+             .exitFullScreen, .enterFullScreen, .fnDown, .fnUp:
             break
         }
     }
@@ -185,6 +191,15 @@ final class MediaController {
             return abs(f.minX - pos.x) <= 2 && abs(f.minY - pos.y) <= 2 && abs(f.width - size.width) <= 2 && abs(f.height - size.height) <= 2
         }
         return (ax, covers)
+    }
+
+    /// Fn / Globe key (keycode 63) as a modifier change, like the real key.
+    private func postFn(down: Bool) {
+        let src = CGEventSource(stateID: .hidSystemState)
+        guard let e = CGEvent(keyboardEventSource: src, virtualKey: 63, keyDown: down) else { return }
+        e.type = .flagsChanged
+        e.flags = down ? .maskSecondaryFn : []
+        e.post(tap: .cghidEventTap)
     }
 
     private func postKey(_ key: CGKeyCode, _ flags: CGEventFlags) {

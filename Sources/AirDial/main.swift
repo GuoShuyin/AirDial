@@ -45,6 +45,7 @@ struct Options {
       --no-vertical       Disable up/down swipes
       --no-desktops       Disable open-palm swipes (desktops and Mission Control)
       --no-mission-control  Disable open-palm up/down = Mission Control
+      --no-thumbs-up      Don't hold the Fn / Globe key while you show a thumbs-up
       --no-hand-shapes    Disable fist = exit full screen, open hand = full screen
       --circle-volume     Also change volume by circling the index finger (off: it fights the cursor)
       --knob              Also use the three-finger knob for volume (turn right = up)
@@ -100,6 +101,7 @@ struct Options {
             case "--circle-volume": o.config.enableCircleVolume = true
             case "--knob": o.config.enableKnob = true
             case "--no-hand-shapes": o.config.enableHandShapes = false
+            case "--no-thumbs-up": o.config.enableThumbsUpFn = false
             case "--sensitivity":
                 i += 1
                 if i < args.count, let s = Double(args[i]), s > 0 {
@@ -297,7 +299,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlay.aspect = aspect
         overlay.status = status
         overlay.trail = trail
-        if let a = actions.last(where: { $0 != .pointerRelease }) {
+        if let a = actions.last(where: { $0 != .pointerRelease && $0 != .fnUp }) {
             overlay.lastAction = (label(for: a), Date())
         }
         overlay.needsDisplay = true
@@ -345,6 +347,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .pointerPress: return "🖱 Click"
         case .pointerRelease: return ""
         case .pointerRightClick: return "🖱 Right click"
+        case .fnDown: return "👍 Fn held"
+        case .fnUp: return ""
         case .exitFullScreen: return "✊ Exit full screen"
         case .enterFullScreen: return "🖐 Full screen"
         }

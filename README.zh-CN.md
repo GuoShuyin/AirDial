@@ -18,6 +18,7 @@
 | 🖐 张开手掌，快速**向上或向下**挥 | 打开调度中心（展开所有窗口），再挥一次关闭 |
 | 🖐 → ✊ 张开的手握成拳 | 最前面的窗口退出全屏 |
 | ✊ → 🖐 拳头张开成手掌 | 最前面的窗口进入全屏 |
+| 👍 竖起大拇指（保持） | 按住 Fn / 地球键，放下大拇指就松开（仅 3D） |
 
 ## 原理（为什么不需要训练）
 
@@ -95,6 +96,7 @@ mkdir -p models && curl -L -o models/hand_landmarker.task \
 .build/release/AirDial --circle-volume     # 同时允许单指画圈调音量
 .build/release/AirDial --knob              # 同时允许三指拧旋钮调音量
 .build/release/AirDial --no-hand-shapes    # 关掉握拳退出全屏 / 张开进入全屏
+.build/release/AirDial --no-thumbs-up      # 竖大拇指时不按 Fn / 地球键
 .build/release/AirDial --list-cameras      # 列出摄像头（用 --camera 名字 选择）
 .build/release/AirDial --debug             # 打印每帧识别到的手型
 .build/release/AirDial --log frames.csv    # 逐帧记录诊断数据（见下文）

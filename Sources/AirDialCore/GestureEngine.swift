@@ -6,6 +6,7 @@ public enum GestureAction: String {
     case missionControl
     case pointerPress, pointerRelease   // thumb-middle tap: click / fingers opened again
     case pointerRightClick              // thumb taps the middle finger's second knuckle
+    case fnDown, fnUp                   // thumbs-up held / ended: the Fn (Globe) key
     case exitFullScreen                 // open palm -> fist ("grab")
     case enterFullScreen                // fist -> open palm ("release")
 }
@@ -50,6 +51,7 @@ public final class GestureEngine {
     private var handShapeBlockedUntil: Double = -.infinity
     private var knobBlockedUntil: Double = -.infinity
     private var lastFistSeen: Double = -.infinity
+    private var fistRun = 0
     private var pendingPalm: (action: GestureAction, time: Double)?
     private var palmFilter: OneEuroFilter2D
     private var palmBlockedUntil: Double = -.infinity
@@ -72,15 +74,23 @@ public final class GestureEngine {
     public func process(_ sample: HandSample?, time: Double, aspect: Double = 4.0 / 3.0) -> [GestureAction] {
         let raw = PoseClassifier.classify(sample, config: config)
         status.rawPose = raw
+        let before = activePose
         updatePose(raw, time: time)
         status.pose = activePose
 
         var actions: [GestureAction] = []
+        // Thumbs-up holds Fn / Globe for as long as it lasts.
+        if config.enableThumbsUpFn, before != activePose {
+            if activePose == .thumbsUp { actions.append(.fnDown) }
+            if before == .thumbsUp { actions.append(.fnUp) }
+        }
 
         // Open palm <-> fist (uses the raw shape: these are quick changes, not held poses).
         // While pointing / circling or using two fingers, palm and fist readings are misreads.
         let shapeRaw = activePose == .point || activePose == .twoFingers ? HandPose.other : raw
-        if raw == .fist { lastFistSeen = time }
+        // A fist counts after a few frames in a row: a fast swipe often has a single "fist" frame.
+        fistRun = raw == .fist ? fistRun + 1 : 0
+        if fistRun >= config.fistConfirmFrames { lastFistSeen = time }
         if config.enableHandShapes, let kind = handShape.add(raw: shapeRaw, sample: sample, time: time, config: config),
            time >= handShapeBlockedUntil {
             actions.append(kind == .grab ? .exitFullScreen : .enterFullScreen)
@@ -175,7 +185,7 @@ public final class GestureEngine {
             if let last = lastPalm, time > last.t {
                 let speed = p.distance(to: last.p) / (time - last.t)
                 let still = !config.palmRequireHold || speed < config.palmStillSpeed
-                if still, p.y >= config.palmMinHeight, (s.palmWidth ?? 0) >= config.palmMinWidth {
+                if still, p.y >= config.palmMinHeight, s.palmIsDeliberate(config) {
                     let since = palmStillSince ?? time
                     palmStillSince = since
                     if !config.palmRequireHold || time - since >= config.palmArmSeconds {
@@ -211,6 +221,8 @@ public final class GestureEngine {
                     handShapeBlockedUntil = time + config.crossGestureLockout
                 }
             }
+        case .thumbsUp:
+            status.cursor = nil
         case .none, .other, .fist:
             status.cursor = nil
         }
@@ -281,11 +293,13 @@ public final class GestureEngine {
             candidateCount = 1
         }
 
-        let isGesturePose = raw == .point || raw == .twoFingers || raw == .openPalm
+        let isGesturePose = raw == .point || raw == .twoFingers || raw == .openPalm || raw == .thumbsUp
         let switchNow: Bool
         if isGesturePose {
-            let fromGesture = activePose == .point || activePose == .twoFingers || activePose == .openPalm
-            switchNow = candidateCount >= (fromGesture ? config.poseSwitchFrames : config.poseConfirmFrames)
+            let fromGesture = activePose == .point || activePose == .twoFingers || activePose == .openPalm || activePose == .thumbsUp
+            var need = fromGesture ? config.poseSwitchFrames : config.poseConfirmFrames
+            if raw == .thumbsUp { need = max(need, config.thumbsUpConfirmFrames) }  // a stray Fn press is intrusive
+            switchNow = candidateCount >= need
         } else {
             // Leaving a gesture pose is slower: tolerate a few misread frames mid-gesture.
             switchNow = time - lastActiveSeen > config.poseDropSeconds

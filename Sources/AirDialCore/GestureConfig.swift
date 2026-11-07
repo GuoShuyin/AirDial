@@ -10,6 +10,16 @@ public struct GestureConfig {
     public var bendExtendedMax: Double = 60
     /// ...and more than this is curled.
     public var bendCurledMin: Double = 100
+    /// 3D thumbs-up: thumb tip at least this far from the index knuckle and this much higher
+    /// than the thumb's own middle joint (metres).
+    public var thumbsUpOut3D: Double = 0.05
+    public var thumbsUpRise3D: Double = 0.025
+    /// Frames in a row before a thumbs-up counts (0.3 s): a stray Fn press can open the emoji picker.
+    public var thumbsUpConfirmFrames: Int = 9
+    /// Thumbs-up holds the Fn / Globe key while it lasts.
+    public var enableThumbsUpFn: Bool = true
+    /// 3D: all four fingers bent less than this = open palm (a waving hand measured 60-80).
+    public var palmOpenBendMax: Double = 90
     /// tip-to-wrist / pip-to-wrist above this => finger extended.
     public var extendedRatio: Double = 1.12
     /// tip-to-wrist / pip-to-wrist below this => finger curled.
@@ -111,7 +121,7 @@ public struct GestureConfig {
     public var enablePalmVerticalSwipe: Bool = true
     /// Minimum sideways travel of the palm centre within `swipeWindow`.
     /// Larger than the two-finger swipe so that circling with an open hand doesn't switch desktops.
-    public var palmSwipeMinDistance: Double = 0.25
+    public var palmSwipeMinDistance: Double = 0.2
     /// Strict mode (`--palm-hold`): the palm must be held still (slower than `palmStillSpeed`,
     /// image heights / s) for `palmArmSeconds` before a swipe counts, and the swipe must start
     /// within `palmArmedWindow`. Off by default: swiping straight away feels much better, and the
@@ -131,6 +141,11 @@ public struct GestureConfig {
     /// The palm must look at least this wide (index MCP to little MCP, image heights) to arm.
     /// Deliberate palm swipes measured 0.135-0.17; hands passing by / resting 0.08-0.12.
     public var palmMinWidth: Double = 0.14
+    /// 3D (MediaPipe): palm facing the camera at least this much (0 edge-on ... 1 flat; open
+    /// palms measured median 0.66-0.81) and at least this wide. MediaPipe's knuckles sit closer
+    /// together than Vision's, so the 2D width threshold above blocked every palm swipe.
+    public var palmMinFacing3D: Double = 0.5
+    public var palmMinWidth3D: Double = 0.07
     /// A jump larger than this between two frames is a keypoint glitch, not hand motion.
     /// Kept large: a real palm swipe moves up to ~0.3 per frame, more when blurred frames drop out.
     public var palmMaxJump: Double = 1.0
@@ -150,6 +165,8 @@ public struct GestureConfig {
     /// for `handShapeSwipeLockout`. (Closing or opening the hand while raising it must not also
     /// be a swipe up.)
     public var palmFistExclusion: Double = 0.5
+    /// Frames in a row before a fist reading counts for that exclusion.
+    public var fistConfirmFrames: Int = 3
     public var handShapeSwipeLockout: Double = 1.0
     /// A detected palm swipe is only acted on after the hand stayed open this long (a fist
     /// appearing in the meantime cancels it).
@@ -177,7 +194,8 @@ public struct GestureConfig {
     /// 3D (MediaPipe): thumb tip to pinch fingertip distance in metres: below = pinched, above = open.
     /// (Also the "touching the middle finger" distance for taps and scrolling.)
     public var pinchClose3D: Double = 0.02
-    public var pinchOpen3D: Double = 0.035
+    /// Lifted off again: 2.5 cm (3.5 cm asked for too high a lift between clicks).
+    public var pinchOpen3D: Double = 0.025
     /// 3D: frames in a row the thumb must touch (3D is steady enough for a short tap).
     public var pinchFrames3D: Int = 2
     /// 3D: a click must be a tap: within `tapWindow` before touching, the thumb was at least
@@ -188,7 +206,8 @@ public struct GestureConfig {
     /// 3D: after the thumb taps down, wait this long (or until it lifts) before clicking; if it
     /// slides more than `tapSlideCancel3D` along the finger meanwhile, it's scrolling instead.
     public var tapConfirm: Double = 0.2
-    public var tapSlideCancel3D: Double = 0.004
+    /// (4 mm was within MediaPipe's own jitter and cancelled almost every click.)
+    public var tapSlideCancel3D: Double = 0.012
     /// 3D left click target: the middle finger's first knuckle by the fingertip (DIP), or with
     /// this set, the fingertip itself. The right click is always the second knuckle (PIP).
     public var leftClickAtFingertip: Bool = false

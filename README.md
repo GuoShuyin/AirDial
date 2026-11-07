@@ -18,6 +18,7 @@ Mid-air, BMW-style gestures for music on macOS, using the regular built-in webca
 | 🖐 Open palm, quick swipe **up or down** | Mission Control (all windows); do it again to close it |
 | 🖐 → ✊ Close your open hand into a fist | The front window leaves full screen |
 | ✊ → 🖐 Open a fist into an open hand | The front window goes full screen |
+| 👍 Thumbs up (hold) | Holds the Fn / Globe key until you lower the thumb (3D only) |
 
 ## How it works (and why no training is needed)
 
@@ -95,6 +96,7 @@ Palm swipes send Control+← / Control+→ / Control+↑. These are macOS's defa
 .build/release/AirDial --circle-volume     # also change volume by circling the index finger
 .build/release/AirDial --knob              # also change volume with the three-finger knob
 .build/release/AirDial --no-hand-shapes    # disable fist / open hand = leave / enter full screen
+.build/release/AirDial --no-thumbs-up      # don't hold Fn / Globe on a thumbs-up
 .build/release/AirDial --list-cameras      # list cameras (pick one with --camera NAME)
 .build/release/AirDial --debug             # print the hand shape of every frame
 .build/release/AirDial --log frames.csv    # write per-frame diagnostics (see below)
